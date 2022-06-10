@@ -27,7 +27,7 @@ AGGREGATE_STATS_EVERY = 10
 EPISODE = 1000
 MIN_REWARD = -200
 
-EPSILON_DECAY = 0.95
+EPSILON_DECAY = 0.99
 MIN_EPSILON = 0.001
 epsilon = 1
 
@@ -61,8 +61,7 @@ if __name__ == "__main__":
 
     print("Prediction 초기화")
     # Prediction 초기화.
-    agent.get_qs([np.ones((env.im_height, env.im_width, 3)), np.ones((env.im_height, env.im_width, 3)),
-                  np.ones((env.im_height, env.im_width, 3))])
+    agent.get_qs(np.ones((env.im_height, env.im_width, 3)))
 
     print("Start Learning")
     for episode in tqdm(range(1, EPISODE + 1), ascii=True, unit="episodes"):
@@ -87,8 +86,9 @@ if __name__ == "__main__":
             if np.random.random() > epsilon:  # epsilon 이상이면 기존 table 값 사용
                 action = np.argmax(agent.get_qs(current_state))
                 print(agent.get_qs(current_state))
+                print(action)
             else:  # epsilon 이하면 랜덤으로
-                action = np.random.randint(0, 3)
+                action = np.random.randint(0, RL_Model.ACTION_NUMBER)
             time.sleep(1 / FPS)
             new_state, reward, done, _ = env.step(action)
             episode_reward += reward

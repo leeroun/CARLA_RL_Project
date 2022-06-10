@@ -29,7 +29,7 @@ DISCOUNT = 0.99
 SECONDS_PER_EPISODE = 10
 
 REPLAY_MEMORY_SIZE = 5_000
-MODEL_NAME = "CNN3"
+MODEL_NAME = "CNN_SEG"
 SHOW_CAM = True
 
 
@@ -74,64 +74,23 @@ class DQNAgent:
         self.training_initialized = False
 
     def create_model(self):
-        # model = Sequential()
-        #
-        # model.add(Conv2D(64, kernel_size=3, strides=3, input_shape=(IM_HEIGHT, IM_WIDTH, 3), padding='same'))
-        # model.add(Activation('relu'))
-        # model.add(AveragePooling2D(pool_size=(5, 5), strides=(3, 3), padding='same'))
-        #
-        # model.add(Conv2D(64, kernel_size=3, strides=3, padding='same'))
-        # model.add(Activation('relu'))
-        # model.add(AveragePooling2D(pool_size=(5, 5), strides=(3, 3), padding='same'))
-        #
-        # model.add(Conv2D(64, kernel_size=3, strides=3, padding='same'))
-        # model.add(Activation('relu'))
-        # model.add(AveragePooling2D(pool_size=(5, 5), strides=(3, 3), padding='same'))
-        #
-        # model.add(Flatten())
-        # model.add(Dense(3, input_dim=64, activation='relu'))
-        in_rgb = Input(shape=(IM_HEIGHT, IM_WIDTH, 3))
-        in_dep = Input(shape=(IM_HEIGHT, IM_WIDTH, 3))
-        in_seg = Input(shape=(IM_HEIGHT, IM_WIDTH, 3))
+        model = Sequential()
 
-        out_rgb1 = Conv2D(64, kernel_size=3, strides=3, input_shape=(IM_HEIGHT, IM_WIDTH, 3), padding='same')(in_rgb)
-        out_dep1 = Conv2D(64, kernel_size=3, strides=3, input_shape=(IM_HEIGHT, IM_WIDTH, 3), padding='same')(in_dep)
-        out_seg1 = Conv2D(64, kernel_size=3, strides=3, input_shape=(IM_HEIGHT, IM_WIDTH, 3), padding='same')(in_seg)
-        aout_rgb1 = Activation('relu')(out_rgb1)
-        aout_dep1 = Activation('relu')(out_dep1)
-        aout_seg1 = Activation('relu')(out_seg1)
-        pout_rgb1 = AveragePooling2D(pool_size=(5, 5), strides=(3, 3), padding='same')(aout_rgb1)
-        pout_dep1 = AveragePooling2D(pool_size=(5, 5), strides=(3, 3), padding='same')(aout_dep1)
-        pout_seg1 = AveragePooling2D(pool_size=(5, 5), strides=(3, 3), padding='same')(aout_seg1)
+        model.add(Conv2D(64, kernel_size=3, strides=3, input_shape=(IM_HEIGHT, IM_WIDTH, 3), padding='same'))
+        model.add(Activation('relu'))
+        model.add(AveragePooling2D(pool_size=(5, 5), strides=(3, 3), padding='same'))
 
-        out_rgb2 = Conv2D(64, kernel_size=3, strides=3, padding='same')(pout_rgb1)
-        out_dep2 = Conv2D(64, kernel_size=3, strides=3, padding='same')(pout_dep1)
-        out_seg2 = Conv2D(64, kernel_size=3, strides=3, padding='same')(pout_seg1)
-        aout_rgb2 = Activation('relu')(out_rgb2)
-        aout_dep2 = Activation('relu')(out_dep2)
-        aout_seg2 = Activation('relu')(out_seg2)
-        pout_rgb2 = AveragePooling2D(pool_size=(5, 5), strides=(3, 3), padding='same')(aout_rgb2)
-        pout_dep2 = AveragePooling2D(pool_size=(5, 5), strides=(3, 3), padding='same')(aout_dep2)
-        pout_seg2 = AveragePooling2D(pool_size=(5, 5), strides=(3, 3), padding='same')(aout_seg2)
+        model.add(Conv2D(64, kernel_size=3, strides=3, padding='same'))
+        model.add(Activation('relu'))
+        model.add(AveragePooling2D(pool_size=(5, 5), strides=(3, 3), padding='same'))
 
-        out_rgb3 = Conv2D(64, kernel_size=3, strides=3, padding='same')(pout_rgb2)
-        out_dep3 = Conv2D(64, kernel_size=3, strides=3, padding='same')(pout_dep2)
-        out_seg3 = Conv2D(64, kernel_size=3, strides=3, padding='same')(pout_seg2)
-        aout_rgb3 = Activation('relu')(out_rgb3)
-        aout_dep3 = Activation('relu')(out_dep3)
-        aout_seg3 = Activation('relu')(out_seg3)
-        pout_rgb3 = AveragePooling2D(pool_size=(5, 5), strides=(3, 3), padding='same')(aout_rgb3)
-        pout_dep3 = AveragePooling2D(pool_size=(5, 5), strides=(3, 3), padding='same')(aout_dep3)
-        pout_seg3 = AveragePooling2D(pool_size=(5, 5), strides=(3, 3), padding='same')(aout_seg3)
+        model.add(Conv2D(64, kernel_size=3, strides=3, padding='same'))
+        model.add(Activation('relu'))
+        model.add(AveragePooling2D(pool_size=(5, 5), strides=(3, 3), padding='same'))
 
-        fout_rgb = Flatten()(pout_rgb3)
-        fout_dep = Flatten()(pout_dep3)
-        fout_seg = Flatten()(pout_seg3)
+        model.add(Flatten())
+        model.add(Dense(ACTION_NUMBER, input_dim=64, activation='relu'))
 
-        out = Concatenate(axis=1)([fout_rgb, fout_dep, fout_seg])
-        dout = Dense(ACTION_NUMBER, input_dim=192, activation='relu')(out)
-
-        model = Model(inputs=[in_rgb, in_dep, in_seg], outputs=dout)
         model.compile(loss="mse", optimizer=Adam(lr=0.001), metrics=["accuracy"])
         model.summary()
         return model
@@ -144,15 +103,12 @@ class DQNAgent:
             return
         minibatch = random.sample(self.replay_memory, MINIBATCH_SIZE)
 
-        print(np.array(minibatch[0][0]).shape)
-
-        current_states = [np.array([transition[0][0] for transition in minibatch]) / 255, np.array([transition[0][1] for transition in minibatch]) / 255, np.array([transition[0][2] for transition in minibatch]) / 255,]
-
+        current_states = np.array([transition[0] for transition in minibatch]) / 255
         with self.graph.as_default():
             current_qs_list = self.model.predict(current_states, PREDICTION_BATCH_SIZE)
 
-        new_current_states = [np.array([transition[3][0] for transition in minibatch]) / 255, np.array([transition[3][1] for transition in minibatch]) / 255, np.array([transition[3][2] for transition in minibatch]) / 255,]
-
+        new_current_states = np.array([transition[3] for transition in minibatch]) / 255
+        
         with self.graph.as_default():
             future_qs_list = self.target_model.predict(new_current_states, PREDICTION_BATCH_SIZE)
 
@@ -189,17 +145,16 @@ class DQNAgent:
             self.target_update_counter = 0
 
     def get_qs(self, state):
-        return self.model.predict([np.array(state[0]).reshape(-1, *state[0].shape) / 255, np.array(state[1]).reshape(-1, *state[1].shape) / 255, np.array(state[2]).reshape(-1, *state[2].shape) / 255])[0]
+        return self.model.predict(np.array(state).reshape(-1, *state.shape) / 255)[0]
 
     def train_in_loop(self):
-        X = [np.random.uniform(size=(1, IM_HEIGHT, IM_WIDTH, 3)).astype(np.float32), np.random.uniform(size=(1, IM_HEIGHT, IM_WIDTH, 3)).astype(np.float32), np.random.uniform(size=(1, IM_HEIGHT, IM_WIDTH, 3)).astype(np.float32)]
+        X = np.random.uniform(size=(1, IM_HEIGHT, IM_WIDTH, 3)).astype(np.float32)
         y = np.random.uniform(size=(1, ACTION_NUMBER)).astype(np.float32)
 
         with self.graph.as_default():
             self.model.fit(X, y, verbose=False, batch_size=1)
 
         self.training_initialized = True
-        print('model fitted')
         while True:
             if self.terminate:
                 return
@@ -211,8 +166,6 @@ class CarEnv:
     STEER_AMT = 1.0
     im_width = IM_WIDTH
     im_height = IM_HEIGHT
-    rgb_camera = None
-    depth_camera = None
     segmentation_camera = None
 
     def __init__(self, result=False):
@@ -272,30 +225,12 @@ class CarEnv:
                 self.actor_list.append(self.vehicle)
                 break
 
-        rgb_cam = self.blueprint_library.find("sensor.camera.rgb")
-        rgb_cam.set_attribute("image_size_x", f"{IM_WIDTH}")
-        rgb_cam.set_attribute("image_size_y", f"{IM_HEIGHT}")
-        rgb_cam.set_attribute("fov", f"110")
-
-        dep_cam = self.blueprint_library.find("sensor.camera.depth")
-        dep_cam.set_attribute("image_size_x", f"{IM_WIDTH}")
-        dep_cam.set_attribute("image_size_y", f"{IM_HEIGHT}")
-        dep_cam.set_attribute("fov", "110")
-
         seg_cam = self.blueprint_library.find("sensor.camera.semantic_segmentation")
         seg_cam.set_attribute("image_size_x", f"{IM_WIDTH}")
         seg_cam.set_attribute("image_size_y", f"{IM_HEIGHT}")
         seg_cam.set_attribute("fov", f"110")
 
         transform = carla.Transform(carla.Location(x=2.5, z=0.7))
-
-        rgb_sensor = self.world.spawn_actor(rgb_cam, transform, attach_to=self.vehicle)
-        self.actor_list.append(rgb_sensor)
-        rgb_sensor.listen(lambda data: self.process_rgb_img(data))
-
-        dep_sensor = self.world.spawn_actor(dep_cam, transform, attach_to=self.vehicle)
-        self.actor_list.append(dep_sensor)
-        dep_sensor.listen(lambda data: self.process_depth_img(data))
 
         seg_sensor = self.world.spawn_actor(seg_cam, transform, attach_to=self.vehicle)
         self.actor_list.append(seg_sensor)
@@ -314,16 +249,16 @@ class CarEnv:
         self.actor_list.append(line_sensor)
         line_sensor.listen(lambda event: self.on_invasion(event))
 
-        while self.rgb_camera is None or self.depth_camera is None or self.segmentation_camera is None:
+        while self.segmentation_camera is None:
             time.sleep(0.01)
 
         self.episode_start = time.time()
         self.vehicle.apply_control(carla.VehicleControl(throttle=0.0, brake=0.0))
 
-        return [self.rgb_camera, self.depth_camera, self.segmentation_camera]
+        return self.segmentation_camera
 
     def get_state(self):
-        return [self.rgb_camera, self.depth_camera, self.segmentation_camera]
+        return self.segmentation_camera
 
     def collision_data(self, event):
         self.collision_hist.append(event)
@@ -331,53 +266,36 @@ class CarEnv:
     def on_invasion(self, event):
         self.invasion_hist.append(event)
 
-    def process_rgb_img(self, image):
-        i = np.array(image.raw_data)
-        i2 = i.reshape((self.im_height, self.im_width, 4))
-        i3 = i2[:, :, :3]
-        if SHOW_CAM:
-            cv2.imshow("", i3)
-            cv2.waitKey(1)
-        self.rgb_camera = i3
-
-    def process_depth_img(self, image):
-        image.convert(carla.ColorConverter.LogarithmicDepth)
-        i = np.array(image.raw_data)
-        i2 = i.reshape((IM_HEIGHT, IM_WIDTH, 4))
-        i3 = i2[:, :, :3]
-        self.depth_camera = i3
-
     def process_segmentation_img(self, image):
         image.convert(carla.ColorConverter.CityScapesPalette)
         i = np.array(image.raw_data)
         i2 = i.reshape((IM_HEIGHT, IM_WIDTH, 4))
         i3 = i2[:, :, :3]
+        if SHOW_CAM:
+            cv2.imshow("", i3)
+            cv2.waitKey(1)
         self.segmentation_camera = i3
 
     def step(self, action):
         if action == 0:
-            if self.handle_value <= 0.9:
-                self.handle_value += 0.1
-        elif action == 1:
-            if self.handle_value >= -0.9:
-                self.handle_value -= 0.1
-        elif action == 2:
             if self.throttle_value <= 0.9:
                 self.throttle_value += 0.1
-        elif action == 3:
+        elif action == 1:
             if self.throttle_value >= 0.1:
                 self.throttle_value -= 0.1
+        elif action == 2:
+            self.handle_value = 1
+        elif action == 3:
+            self.handle_value = -1
         elif action == 4:
-            if self.brake_value <= 0.9:
-                self.brake_value += 0.1
+            self.brake_value = 1
         elif action == 5:
-            if self.brake_value >= 0.1:
-                self.brake_value -= 0.1
+            self.brake_value = 0
 
         self.vehicle.apply_control(carla.VehicleControl(throttle=self.throttle_value, steer=self.handle_value * self.STEER_AMT, brake=self.brake_value))
 
         if self.result:
-            return [self.rgb_camera, self.depth_camera, self.segmentation_camera], 0, False, None
+            return self.segmentation_camera, 0, False, None
 
         v = self.vehicle.get_velocity()
         kmh = int(3.6 * math.sqrt(v.x ** 2 + v.y ** 2 + v.z ** 2))
@@ -405,7 +323,7 @@ class CarEnv:
         if self.episode_start + SECONDS_PER_EPISODE < time.time():
             done = True
 
-        return [self.rgb_camera, self.depth_camera, self.segmentation_camera], reward, done, None
+        return self.segmentation_camera, reward, done, None
 
     def destroy_actors(self, bAll_Actors=False):
         print(f'destroy actors({len(self.actor_list)})')
