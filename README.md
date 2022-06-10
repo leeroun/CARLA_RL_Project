@@ -13,6 +13,16 @@ https://github.com/carla-simulator/carla
 
 Model: DQN
 
+### python files
+- project files
+-- RL_Main.py: learning main code
+-- RL_Model.py: model architecture & environment code
+-- RL_Result.py: To check learning model result code
+- test files
+-- ThreadTest.py: Test multi threading
+-- Tutorial.py: Test connect to carla environment
+-- Tutorial2.py: Extract input data used for learning
+
 ### Version Check
 - Carla 0.9.13
 - Keras 2.24
