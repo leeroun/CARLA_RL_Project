@@ -1,6 +1,6 @@
 # CARLA_RL_Project
 
-2022-1 캡스톤 디자인 프로젝트
+2022-1 캡스톤 디자인 프로젝트 <b>
 Autonomous driving vehicle in urban traffic simulator with reinforcement learning
 
 Simulator: CARLA
