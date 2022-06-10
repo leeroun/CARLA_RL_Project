@@ -7,11 +7,12 @@ Traffic Simulator 'Carla' must be installed to run project.
 
 ## Autonomous driving vehicle in urban traffic simulator with reinforcement learning
 
-Simulator: CARLA
+Simulator: CARLA  
 https://github.com/carla-simulator/carla
 
 
-Model: DQN
+Model: DQN  
+https://arxiv.org/abs/1312.5602
 
 ### Python codes
 - Project
