@@ -2,14 +2,10 @@
 
 2022-1 KHU Software Capstone Design Project
 
-This reoisitory has only python code used for learning and excution.  
-Traffic Simulator 'Carla' must be installed to run project.
-
-## Autonomous driving vehicle in urban traffic simulator with reinforcement learning
+## Autonomous driving vehicle in urban traffic with reinforcement learning
 
 Simulator: CARLA  
 https://github.com/carla-simulator/carla
-
 
 Model: DQN  
 https://arxiv.org/abs/1312.5602
@@ -23,6 +19,10 @@ https://arxiv.org/abs/1312.5602
   - ThreadTest.py: Test multi threading
   - Tutorial.py: Test connect to carla environment
   - Tutorial2.py: Extract input data used for learning
+
+## To start project
+This reoisitory has only python code used for learning and excution.  
+Traffic Simulator 'Carla' must be installed to run project.
 
 ### Version Check
 - Carla 0.9.13
