@@ -2,7 +2,7 @@
 
 2022-1 KHU Software Capstone Design Project
 
-This reoisitory has only python code used for learning and excution. <hr>
+This reoisitory has only python code used for learning and excution. <n>
 Traffic Simulator 'Carla' must be installed to run project.
 
 ## Autonomous driving vehicle in urban traffic simulator with reinforcement learning
