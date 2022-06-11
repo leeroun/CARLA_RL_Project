@@ -27,7 +27,7 @@ AGGREGATE_STATS_EVERY = 10
 EPISODE = 1000
 MIN_REWARD = -200
 
-EPSILON_DECAY = 0.99
+EPSILON_DECAY = 0.995
 MIN_EPSILON = 0.001
 epsilon = 1
 
@@ -114,7 +114,7 @@ if __name__ == "__main__":
                                            epsilon=epsilon)
 
             # 모델 저장
-            if episode % 10 == 0:
+            if episode % 100 == 0:
                 print(f'saved model in (models/{RL_Model.MODEL_NAME}_weights_{int(time.time())}')
                 agent.model.save_weights(f'models/{RL_Model.MODEL_NAME}_weights_{int(time.time())}')
             # agent.model.save(

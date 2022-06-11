@@ -4,6 +4,8 @@ import time
 import numpy as np
 import cv2
 
+import math
+
 actor_list = []
 vehicle_list = []
 walker_list = []
@@ -58,9 +60,9 @@ def render_image():
 
 def on_invasion(event):
     lane_types = set(x.type for x in event.crossed_lane_markings)
-    print(lane_types)
-    for x in lane_types:
-        print(f'Crossed line {str(x)}')
+    # print(lane_types)
+    # for x in lane_types:
+    #     print(f'Crossed line {str(x)}')
 
 
 def main(client):
@@ -72,43 +74,98 @@ def main(client):
     bp_library = world.get_blueprint_library()
     bp = bp_library.filter("model3")[0]
 
-    spawn_points = world.get_map().get_spawn_points()
+    spawn_points = []  # world.get_map().get_self.spawn_points()
+
+    spawn_points.append(carla.Transform(carla.Location(-103, 0, 0.6), carla.Rotation(0, -90, 0)))  # actor spawn point
+
+    spawn_points.append(carla.Transform(carla.Location(-103, -17, 0.6), carla.Rotation(0, -90, 0)))
+    spawn_points.append(carla.Transform(carla.Location(-106.5, -10, 0.6), carla.Rotation(0, -90, 0)))
+    spawn_points.append(carla.Transform(carla.Location(-90.2, -50, 0.6), carla.Rotation(0, -45, 0)))
+    spawn_points.append(carla.Transform(carla.Location(-105.8, -30, 0.6), carla.Rotation(0, -80, 0)))
+
+    spawn_points.append(carla.Transform(carla.Location(-30, -57.5, 0.6), carla.Rotation(0, 0, 0)))
+    spawn_points.append(carla.Transform(carla.Location(30, -57.5, 0.6), carla.Rotation(0, 0, 0)))
+    spawn_points.append(carla.Transform(carla.Location(50, -57.5, 0.6), carla.Rotation(0, 0, 0)))
+    spawn_points.append(carla.Transform(carla.Location(-20, -60.5, 0.6), carla.Rotation(0, 0, 0)))
+    spawn_points.append(carla.Transform(carla.Location(0, -60.5, 0.6), carla.Rotation(0, 0, 0)))
+    spawn_points.append(carla.Transform(carla.Location(20, -60.5, 0.6), carla.Rotation(0, 0, 0)))
+
+    spawn_points.append(carla.Transform(carla.Location(-110.1, -28, 0.6), carla.Rotation(0, 90, 0)))
+    spawn_points.append(carla.Transform(carla.Location(-113.5, -23, 0.6), carla.Rotation(0, 90, 0)))
+    spawn_points.append(carla.Transform(carla.Location(-106.5, -40, 0.6), carla.Rotation(0, 115, 0)))
+    spawn_points.append(carla.Transform(carla.Location(-90.5, -63.5, 0.6), carla.Rotation(0, 150, 0)))
+
+    spawn_points.append(carla.Transform(carla.Location(-20, -68.3, 0.6), carla.Rotation(0, 180, 0)))
+    spawn_points.append(carla.Transform(carla.Location(0, -68.3, 0.6), carla.Rotation(0, 180, 0)))
+    spawn_points.append(carla.Transform(carla.Location(40, -68.3, 0.6), carla.Rotation(0, 180, 0)))
+    spawn_points.append(carla.Transform(carla.Location(-10, -64.7, 0.6), carla.Rotation(0, 180, 0)))
+    spawn_points.append(carla.Transform(carla.Location(30, -64.7, 0.6), carla.Rotation(0, 180, 0)))
+    spawn_points.append(carla.Transform(carla.Location(60, -64.7, 0.6), carla.Rotation(0, 180, 0)))
+
+    spawn_points.append(carla.Transform(carla.Location(-42, -30, 0.6), carla.Rotation(0, -90, 0)))
+    spawn_points.append(carla.Transform(carla.Location(-42, -10, 0.6), carla.Rotation(0, -90, 0)))
+    spawn_points.append(carla.Transform(carla.Location(-42, 5, 0.6), carla.Rotation(0, -90, 0)))
+    spawn_points.append(carla.Transform(carla.Location(-45.5, -25, 0.6), carla.Rotation(0, -90, 0)))
+    spawn_points.append(carla.Transform(carla.Location(-45.5, -5, 0.6), carla.Rotation(0, -90, 0)))
+    spawn_points.append(carla.Transform(carla.Location(-45.5, 10, 0.6), carla.Rotation(0, -90, 0)))
+
+    spawn_points.append(carla.Transform(carla.Location(106.5, -17, 0.6), carla.Rotation(0, -90, 0)))
+    spawn_points.append(carla.Transform(carla.Location(106.5, -5, 0.6), carla.Rotation(0, -90, 0)))
+    spawn_points.append(carla.Transform(carla.Location(106.5, 0, 0.6), carla.Rotation(0, -90, 0)))
+    spawn_points.append(carla.Transform(carla.Location(106.5, 10, 0.6), carla.Rotation(0, -90, 0)))
+    spawn_points.append(carla.Transform(carla.Location(110, -15, 0.6), carla.Rotation(0, -90, 0)))
+    spawn_points.append(carla.Transform(carla.Location(110, -5, 0.6), carla.Rotation(0, -90, 0)))
+    spawn_points.append(carla.Transform(carla.Location(110, 10, 0.6), carla.Rotation(0, -90, 0)))
+    spawn_points.append(carla.Transform(carla.Location(110, 5, 0.6), carla.Rotation(0, -90, 0)))
+
+    spawn_points.append(carla.Transform(carla.Location(106.5, 45, 0.6), carla.Rotation(0, -90, 0)))
+    spawn_points.append(carla.Transform(carla.Location(106.5, 55, 0.6), carla.Rotation(0, -90, 0)))
+    spawn_points.append(carla.Transform(carla.Location(106.5, 65, 0.6), carla.Rotation(0, -90, 0)))
+    spawn_points.append(carla.Transform(carla.Location(106.5, 75, 0.6), carla.Rotation(0, -90, 0)))
+    spawn_points.append(carla.Transform(carla.Location(110, 45, 0.6), carla.Rotation(0, -90, 0)))
+    spawn_points.append(carla.Transform(carla.Location(110, 55, 0.6), carla.Rotation(0, -90, 0)))
+    spawn_points.append(carla.Transform(carla.Location(110, 65, 0.6), carla.Rotation(0, -90, 0)))
+    spawn_points.append(carla.Transform(carla.Location(110, 75, 0.6), carla.Rotation(0, -90, 0)))
+
     # actor vehicle 생성
-    vehicle = world.spawn_actor(bp, random.choice(spawn_points))
+    world.get_spectator().set_transform(spawn_points[0])
+    vehicle = world.spawn_actor(bp, spawn_points[0])
+    print(f'0: {spawn_points[0]}')
     # vehicle.set_autopilot(True)
 
-    vehicle.apply_control(carla.VehicleControl(throttle=1, steer=0))
+    vehicle.apply_control(carla.VehicleControl(throttle=0, steer=0))
     actor_list.append(vehicle)
 
     # 다른 vehicle 생성
     vehicle_blueprints = world.get_blueprint_library().filter('*vehicle*')
-
+    #
     print("vehicle spawning")
-    for i in range(1, len(spawn_points), 3):
-        tmp_vehicle = world.try_spawn_actor(random.choice(vehicle_blueprints), spawn_points[i])
+    for i in range(1, len(spawn_points)):
+        tmp_vehicle = world.try_spawn_actor(vehicle_blueprints[i%len(vehicle_blueprints)], spawn_points[i])
         if tmp_vehicle is not None:
             tmp_vehicle.set_autopilot(True)
             vehicle_list.append(tmp_vehicle)
+        print(f'{i}: {spawn_points[i]}')
 
-    # walker 생성
-    print("walker spawning")
-    walker_blueprints = world.get_blueprint_library().filter('walker.pedestrian.*')
-    walker_control_blueprint = world.get_blueprint_library().find('controller.ai.walker')
-    for i in range(50):
-        spawn_point = carla.Transform()
-        spawn_point.location = world.get_random_location_from_navigation()
-        tmp_walker = world.try_spawn_actor(random.choice(walker_blueprints), spawn_point)
-
-        if tmp_walker is not None:
-            tmp_controller = world.try_spawn_actor(walker_control_blueprint, carla.Transform(), attach_to=tmp_walker)
-            walker_list.append(tmp_walker)
-            walker_controller_list.append(tmp_controller)
-
-    world.wait_for_tick()
-    for controller in walker_controller_list:
-        controller.start()
-        controller.go_to_location(world.get_random_location_from_navigation())
-        controller.set_max_speed(1 + random.random())
+    # # walker 생성
+    # print("walker spawning")
+    # walker_blueprints = world.get_blueprint_library().filter('walker.pedestrian.*')
+    # walker_control_blueprint = world.get_blueprint_library().find('controller.ai.walker')
+    # for i in range(50):
+    #     spawn_point = carla.Transform()
+    #     spawn_point.location = world.get_random_location_from_navigation()
+    #     tmp_walker = world.try_spawn_actor(random.choice(walker_blueprints), spawn_point)
+    #
+    #     if tmp_walker is not None:
+    #         tmp_controller = world.try_spawn_actor(walker_control_blueprint, carla.Transform(), attach_to=tmp_walker)
+    #         walker_list.append(tmp_walker)
+    #         walker_controller_list.append(tmp_controller)
+    #
+    # world.wait_for_tick()
+    # for controller in walker_controller_list:
+    #     controller.start()
+    #     controller.go_to_location(world.get_random_location_from_navigation())
+    #     controller.set_max_speed(1 + random.random())
 
     # camera sensor 추가
     cam_bp = bp_library.find("sensor.camera.rgb")
@@ -148,22 +205,65 @@ def main(client):
     line_sensor.listen(lambda event: on_invasion(event))
 
     cnt = 0
+    throValue = 0
+    handleValue = 0
 
     while 1:
         if cnt > 10000:
             break
         cnt += 1
 
-        if cnt % 10 == 0:
-            action = random.randrange(0, 4)
-            if action == 0:
-                vehicle.apply_control(carla.VehicleControl(throttle=1, steer=1.0))
-            elif action == 1:
-                vehicle.apply_control(carla.VehicleControl(throttle=1, steer=-1.0))
-            elif action == 2:
-                vehicle.apply_control(carla.VehicleControl(throttle=1, reverse=True))
-            else:
-                vehicle.apply_control(carla.VehicleControl(throttle=1, steer=0.0))
+        v = vehicle.get_velocity()
+        kmh = int(3.6 * math.sqrt(v.x ** 2 + v.y ** 2 + v.z ** 2))
+        if cnt == 50:
+            vehicle.apply_control(carla.VehicleControl(brake=1))
+
+        if cnt > 400:
+            if throValue <= 0.5:
+                throValue += 0.1
+            if handleValue >= -0.9:
+                handleValue -= 0.1
+        elif cnt > 200:
+            if throValue >= 0.1:
+                throValue -= 0.1
+        elif cnt > 50:
+            if throValue <= 0.5:
+                throValue += 0.1
+
+        # vehicle.apply_control(carla.VehicleControl(throttle=throValue, steer=handleValue))
+        # print(f'kmh:{kmh} / throValue:{throValue}')
+
+        waypoint = client.get_world().get_map().get_waypoint(vehicle.get_location(), project_to_road=True)
+
+        vehicle_location = vehicle.get_location()
+        waypoint_location = waypoint.transform.location
+        distance = math.sqrt(math.pow((vehicle_location.x - waypoint_location.x), 2)
+                             + math.pow((vehicle_location.y - waypoint_location.y), 2)
+                             + math.pow((vehicle_location.z - waypoint_location.z), 2))
+
+        vehicle_forward = vehicle.get_transform().get_forward_vector()
+        waypoint_forward = waypoint.transform.get_forward_vector()
+        deltaAngle = math.acos(
+            (
+                        vehicle_forward.x * waypoint_forward.x + vehicle_forward.y * waypoint_forward.y + vehicle_forward.z * waypoint_forward.z) /
+            math.sqrt(
+                vehicle_forward.x * vehicle_forward.x + vehicle_forward.y * vehicle_forward.y + vehicle_forward.z * vehicle_forward.z) /
+            math.sqrt(
+                waypoint_forward.x * waypoint_forward.x + waypoint_forward.y * waypoint_forward.y + waypoint_forward.z * waypoint_forward.z)
+        )
+        deltaAngle *= math.degrees(deltaAngle)
+
+        # print(f"distance: {distance} / deltaAngle: {deltaAngle}")
+
+        #     action = random.randrange(0, 4)
+        #     if action == 0:
+        #         vehicle.apply_control(carla.VehicleControl(throttle=1, steer=1.0))
+        #     elif action == 1:
+        #         vehicle.apply_control(carla.VehicleControl(throttle=1, steer=-1.0))
+        #     elif action == 2:
+        #         vehicle.apply_control(carla.VehicleControl(throttle=1, reverse=True))
+        #     else:
+        #         vehicle.apply_control(carla.VehicleControl(throttle=1, steer=0.0))
         world.tick()
 
 

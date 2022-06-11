@@ -1,5 +1,6 @@
-from keras.layers import Conv2D, AveragePooling2D, Activation, Flatten, Dense, Concatenate
+from keras.layers import Conv2D, AveragePooling2D, Activation, Flatten, Dense, Concatenate, GlobalAveragePooling2D
 from keras.optimizers import Adam
+from keras.applications import Xception
 from keras.models import Sequential, Input, Model
 from keras.callbacks import TensorBoard
 
@@ -22,7 +23,7 @@ PREDICTION_BATCH_SIZE = 1
 TRAINING_BATCH_SIZE = MINIBATCH_SIZE // 4
 UPDATE_TARGET_EVERY = 5
 
-ACTION_NUMBER = 6
+ACTION_NUMBER = 4
 
 DISCOUNT = 0.99
 
@@ -30,7 +31,7 @@ SECONDS_PER_EPISODE = 10
 
 REPLAY_MEMORY_SIZE = 5_000
 MODEL_NAME = "CNN_SEG"
-SHOW_CAM = True
+SHOW_CAM = False
 
 
 class ModifiedTensorBoard(TensorBoard):
@@ -74,22 +75,14 @@ class DQNAgent:
         self.training_initialized = False
 
     def create_model(self):
-        model = Sequential()
 
-        model.add(Conv2D(64, kernel_size=3, strides=3, input_shape=(IM_HEIGHT, IM_WIDTH, 3), padding='same'))
-        model.add(Activation('relu'))
-        model.add(AveragePooling2D(pool_size=(5, 5), strides=(3, 3), padding='same'))
+        base_model = Xception(weights=None, include_top=False, input_shape=(IM_HEIGHT, IM_WIDTH, 3))
 
-        model.add(Conv2D(64, kernel_size=3, strides=3, padding='same'))
-        model.add(Activation('relu'))
-        model.add(AveragePooling2D(pool_size=(5, 5), strides=(3, 3), padding='same'))
+        x = base_model.output
+        x = GlobalAveragePooling2D()(x)
 
-        model.add(Conv2D(64, kernel_size=3, strides=3, padding='same'))
-        model.add(Activation('relu'))
-        model.add(AveragePooling2D(pool_size=(5, 5), strides=(3, 3), padding='same'))
-
-        model.add(Flatten())
-        model.add(Dense(ACTION_NUMBER, input_dim=64, activation='relu'))
+        predictions = Dense(ACTION_NUMBER, activation="linear")(x)
+        model = Model(inputs=base_model.input, outputs=predictions)
 
         model.compile(loss="mse", optimizer=Adam(lr=0.001), metrics=["accuracy"])
         model.summary()
@@ -108,7 +101,7 @@ class DQNAgent:
             current_qs_list = self.model.predict(current_states, PREDICTION_BATCH_SIZE)
 
         new_current_states = np.array([transition[3] for transition in minibatch]) / 255
-        
+
         with self.graph.as_default():
             future_qs_list = self.target_model.predict(new_current_states, PREDICTION_BATCH_SIZE)
 
@@ -163,7 +156,6 @@ class DQNAgent:
 
 
 class CarEnv:
-    STEER_AMT = 1.0
     im_width = IM_WIDTH
     im_height = IM_HEIGHT
     segmentation_camera = None
@@ -178,52 +170,91 @@ class CarEnv:
 
         self.vehicle = None
         self.vehicle_list = []
-        self.walker_list = []
-        self.walker_controller_list = []
 
-        self.brake_value = 0.0
-        self.throttle_value = 1.0
         self.handle_value = 0.0
+        self.throttle_value = 0.0
 
         self.episode_start = 0
 
-        self.spawn_points = self.world.get_map().get_spawn_points()
+        # self.spawn_points = self.world.get_map().get_spawn_points()
+        self.spawn_points = []  # world.get_map().get_spawn_points()
+
+        self.spawn_points.append(
+            carla.Transform(carla.Location(-103, 0, 0.6), carla.Rotation(0, -90, 0)))  # actor spawn point
+
+        self.spawn_points.append(carla.Transform(carla.Location(-103, -25, 0.6), carla.Rotation(0, -90, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(-106.5, -10, 0.6), carla.Rotation(0, -90, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(-90.2, -50, 0.6), carla.Rotation(0, -45, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(-105.8, -30, 0.6), carla.Rotation(0, -80, 0)))
+
+        self.spawn_points.append(carla.Transform(carla.Location(-30, -57.5, 0.6), carla.Rotation(0, 0, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(30, -57.5, 0.6), carla.Rotation(0, 0, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(50, -57.5, 0.6), carla.Rotation(0, 0, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(-20, -60.5, 0.6), carla.Rotation(0, 0, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(0, -60.5, 0.6), carla.Rotation(0, 0, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(20, -60.5, 0.6), carla.Rotation(0, 0, 0)))
+
+        self.spawn_points.append(carla.Transform(carla.Location(-110.1, -28, 0.6), carla.Rotation(0, 90, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(-113.5, -23, 0.6), carla.Rotation(0, 90, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(-106.5, -40, 0.6), carla.Rotation(0, 115, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(-90.5, -63.5, 0.6), carla.Rotation(0, 150, 0)))
+
+        self.spawn_points.append(carla.Transform(carla.Location(-20, -68.3, 0.6), carla.Rotation(0, 180, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(0, -68.3, 0.6), carla.Rotation(0, 180, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(40, -68.3, 0.6), carla.Rotation(0, 180, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(-10, -64.7, 0.6), carla.Rotation(0, 180, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(30, -64.7, 0.6), carla.Rotation(0, 180, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(60, -64.7, 0.6), carla.Rotation(0, 180, 0)))
+
+        self.spawn_points.append(carla.Transform(carla.Location(-42, -30, 0.6), carla.Rotation(0, -90, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(-42, -10, 0.6), carla.Rotation(0, -90, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(-42, 5, 0.6), carla.Rotation(0, -90, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(-45.5, -25, 0.6), carla.Rotation(0, -90, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(-45.5, -5, 0.6), carla.Rotation(0, -90, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(-45.5, 10, 0.6), carla.Rotation(0, -90, 0)))
+
+        self.spawn_points.append(carla.Transform(carla.Location(106.5, -17, 0.6), carla.Rotation(0, -90, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(106.5, -5, 0.6), carla.Rotation(0, -90, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(106.5, 0, 0.6), carla.Rotation(0, -90, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(106.5, 10, 0.6), carla.Rotation(0, -90, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(110, -15, 0.6), carla.Rotation(0, -90, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(110, -5, 0.6), carla.Rotation(0, -90, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(110, 10, 0.6), carla.Rotation(0, -90, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(110, 5, 0.6), carla.Rotation(0, -90, 0)))
+
+        self.spawn_points.append(carla.Transform(carla.Location(106.5, 45, 0.6), carla.Rotation(0, -90, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(106.5, 55, 0.6), carla.Rotation(0, -90, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(106.5, 65, 0.6), carla.Rotation(0, -90, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(106.5, 75, 0.6), carla.Rotation(0, -90, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(110, 45, 0.6), carla.Rotation(0, -90, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(110, 55, 0.6), carla.Rotation(0, -90, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(110, 65, 0.6), carla.Rotation(0, -90, 0)))
+        self.spawn_points.append(carla.Transform(carla.Location(110, 75, 0.6), carla.Rotation(0, -90, 0)))
+
+        self.world.get_spectator().set_transform(self.spawn_points[0])
+
         vehicle_blueprints = self.blueprint_library.filter('*vehicle*')
-        for i in range(1, len(self.spawn_points), 3):
+        for i in range(1, len(self.spawn_points)):
             tmp_vehicle = self.world.try_spawn_actor(random.choice(vehicle_blueprints), self.spawn_points[i])
             if tmp_vehicle is not None:
-                tmp_vehicle.set_autopilot(True)
                 self.vehicle_list.append(tmp_vehicle)
-
-        walker_blueprints = self.world.get_blueprint_library().filter('walker.pedestrian.*')
-        walker_control_blueprint = self.blueprint_library.find('controller.ai.walker')
-        for i in range(50):
-            spawn_point = carla.Transform()
-            spawn_point.location = self.world.get_random_location_from_navigation()
-            tmp_walker = self.world.try_spawn_actor(random.choice(walker_blueprints), spawn_point)
-
-            if tmp_walker is not None:
-                tmp_controller = self.world.try_spawn_actor(walker_control_blueprint, carla.Transform(), attach_to=tmp_walker)
-                self.walker_list.append(tmp_walker)
-                self.walker_controller_list.append(tmp_controller)
-
-        self.world.wait_for_tick()
-        for controller in self.walker_controller_list:
-            controller.start()
-            controller.go_to_location(self.world.get_random_location_from_navigation())
-            controller.set_max_speed(1 + random.random())
 
     def reset(self):
         self.collision_hist = []
         self.invasion_hist = []
         self.actor_list = []
 
-        transform = self.spawn_points[10]
+        transform = self.spawn_points[0]
         while True:
             self.vehicle = self.world.try_spawn_actor(self.model_3, transform)
             if self.vehicle is not None:
                 self.actor_list.append(self.vehicle)
                 break
+
+        for i, vehicle in enumerate(self.vehicle_list):
+            print(type(vehicle))
+            vehicle.set_transform(self.spawn_points[i])
+            vehicle.set_autopilot(True)
 
         seg_cam = self.blueprint_library.find("sensor.camera.semantic_segmentation")
         seg_cam.set_attribute("image_size_x", f"{IM_WIDTH}")
@@ -236,7 +267,6 @@ class CarEnv:
         self.actor_list.append(seg_sensor)
         seg_sensor.listen(lambda data: self.process_segmentation_img(data))
 
-        self.vehicle.apply_control(carla.VehicleControl(throttle=0.0, brake=0.0))
         time.sleep(4)
 
         col_sensor_bp = self.blueprint_library.find("sensor.other.collision")
@@ -253,7 +283,7 @@ class CarEnv:
             time.sleep(0.01)
 
         self.episode_start = time.time()
-        self.vehicle.apply_control(carla.VehicleControl(throttle=0.0, brake=0.0))
+        self.vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer=0.0))
 
         return self.segmentation_camera
 
@@ -278,21 +308,19 @@ class CarEnv:
 
     def step(self, action):
         if action == 0:
-            if self.throttle_value <= 0.9:
-                self.throttle_value += 0.1
+            if self.throttle_value <= 0.4:
+                self.throttle_value += 0.05
         elif action == 1:
             if self.throttle_value >= 0.1:
-                self.throttle_value -= 0.1
+                self.throttle_value -= 0.05
         elif action == 2:
-            self.handle_value = 1
+            if self.handle_value >= -0.9:
+                self.handle_value -= 0.05
         elif action == 3:
-            self.handle_value = -1
-        elif action == 4:
-            self.brake_value = 1
-        elif action == 5:
-            self.brake_value = 0
+            if self.handle_value <= 0.9:
+                self.handle_value += 0.05
 
-        self.vehicle.apply_control(carla.VehicleControl(throttle=self.throttle_value, steer=self.handle_value * self.STEER_AMT, brake=self.brake_value))
+        self.vehicle.apply_control(carla.VehicleControl(throttle=self.throttle_value, steer=self.handle_value))
 
         if self.result:
             return self.segmentation_camera, 0, False, None
@@ -304,21 +332,43 @@ class CarEnv:
 
         if len(self.collision_hist) != 0:
             done = True
-            reward -= 200
+            reward -= 500
         else:
-            for hist in self.invasion_hist:
-                line_type = hist.crossed_lane_markings[0].type
-                if line_type == "Solid":
-                    reward -= 100
-                if line_type == "SolidSolid":
-                    reward -= 100
+            # for hist in self.invasion_hist:
+            #     line_type = hist.crossed_lane_markings[0].type
+            #     if line_type == "Solid":
+            #         reward -= 200
+            #     if line_type == "SolidSolid":
+            #         reward -= 200
 
-            if kmh < 50:
-                done = False
-                reward -= 1
-            else:
-                done = False
-                reward += 1
+            waypoint = self.client.get_world().get_map().get_waypoint(self.vehicle.get_location(), project_to_road=True)
+
+            vehicle_location = self.vehicle.get_location()
+            waypoint_location = waypoint.transform.location
+            distance = math.sqrt(math.pow((vehicle_location.x - waypoint_location.x), 2)
+                                 + math.pow((vehicle_location.y - waypoint_location.y), 2)
+                                 + math.pow((vehicle_location.z - waypoint_location.z), 2))
+
+            vehicle_forward = self.vehicle.get_transform().get_forward_vector()
+            waypoint_forward = waypoint.transform.get_forward_vector()
+            deltaAngle = math.acos(
+                (
+                            vehicle_forward.x * waypoint_forward.x + vehicle_forward.y * waypoint_forward.y + vehicle_forward.z * waypoint_forward.z) /
+                math.sqrt(
+                    vehicle_forward.x * vehicle_forward.x + vehicle_forward.y * vehicle_forward.y + vehicle_forward.z * vehicle_forward.z) /
+                math.sqrt(
+                    waypoint_forward.x * waypoint_forward.x + waypoint_forward.y * waypoint_forward.y + waypoint_forward.z * waypoint_forward.z)
+            )
+            deltaAngle *= math.degrees(deltaAngle)
+
+            distance = int(distance * 10)
+            deltaAngle = int(deltaAngle)
+
+            reward -= distance
+            reward -= deltaAngle
+
+            reward += int(kmh * kmh / 100) * 10
+            done = False
 
         if self.episode_start + SECONDS_PER_EPISODE < time.time():
             done = True
@@ -329,15 +379,8 @@ class CarEnv:
         print(f'destroy actors({len(self.actor_list)})')
         # self.client.apply_batch([carla.command.DestroyActor(x) for x in self.actor_list])
         if bAll_Actors:
-            for walcon in self.walker_controller_list:
-                walcon.stop()
-                walcon.destroy()
-
-            self.client.apply_batch([carla.command.DestroyActor(x) for x in self.walker_list])
             self.client.apply_batch([carla.command.DestroyActor(x) for x in self.vehicle_list])
 
         else:
             for actor in self.actor_list:
                 actor.destroy()
-
-
