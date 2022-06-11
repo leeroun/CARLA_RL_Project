@@ -23,7 +23,7 @@ PREDICTION_BATCH_SIZE = 1
 TRAINING_BATCH_SIZE = MINIBATCH_SIZE // 4
 UPDATE_TARGET_EVERY = 5
 
-ACTION_NUMBER = 4
+ACTION_NUMBER = 7
 
 DISCOUNT = 0.99
 
@@ -169,7 +169,6 @@ class CarEnv:
         self.result = result
 
         self.vehicle = None
-        self.vehicle_list = []
 
         self.handle_value = 0.0
         self.throttle_value = 0.0
@@ -179,10 +178,8 @@ class CarEnv:
         # self.spawn_points = self.world.get_map().get_spawn_points()
         self.spawn_points = []  # world.get_map().get_spawn_points()
 
-        self.spawn_points.append(
-            carla.Transform(carla.Location(-103, 0, 0.6), carla.Rotation(0, -90, 0)))  # actor spawn point
+        self.actor_start_point = carla.Transform(carla.Location(-103, 0, 0.6), carla.Rotation(0, -90, 0))  # actor spawn point
 
-        self.spawn_points.append(carla.Transform(carla.Location(-103, -25, 0.6), carla.Rotation(0, -90, 0)))
         self.spawn_points.append(carla.Transform(carla.Location(-106.5, -10, 0.6), carla.Rotation(0, -90, 0)))
         self.spawn_points.append(carla.Transform(carla.Location(-90.2, -50, 0.6), carla.Rotation(0, -45, 0)))
         self.spawn_points.append(carla.Transform(carla.Location(-105.8, -30, 0.6), carla.Rotation(0, -80, 0)))
@@ -231,30 +228,26 @@ class CarEnv:
         self.spawn_points.append(carla.Transform(carla.Location(110, 65, 0.6), carla.Rotation(0, -90, 0)))
         self.spawn_points.append(carla.Transform(carla.Location(110, 75, 0.6), carla.Rotation(0, -90, 0)))
 
-        self.world.get_spectator().set_transform(self.spawn_points[0])
-
-        vehicle_blueprints = self.blueprint_library.filter('*vehicle*')
-        for i in range(1, len(self.spawn_points)):
-            tmp_vehicle = self.world.try_spawn_actor(random.choice(vehicle_blueprints), self.spawn_points[i])
-            if tmp_vehicle is not None:
-                self.vehicle_list.append(tmp_vehicle)
+        self.world.get_spectator().set_transform(self.actor_start_point)
+        self.vehicle_blueprints = self.blueprint_library.filter('*vehicle*')
 
     def reset(self):
         self.collision_hist = []
         self.invasion_hist = []
         self.actor_list = []
+        self.vehicle_list = []
 
-        transform = self.spawn_points[0]
         while True:
-            self.vehicle = self.world.try_spawn_actor(self.model_3, transform)
+            self.vehicle = self.world.try_spawn_actor(self.model_3, self.actor_start_point)
             if self.vehicle is not None:
                 self.actor_list.append(self.vehicle)
                 break
 
-        for i, vehicle in enumerate(self.vehicle_list):
-            print(type(vehicle))
-            vehicle.set_transform(self.spawn_points[i])
-            vehicle.set_autopilot(True)
+        for i in range(0, len(self.spawn_points)):
+            tmp_vehicle = self.world.try_spawn_actor(random.choice(self.vehicle_blueprints), self.spawn_points[i])
+            if tmp_vehicle is not None:
+                tmp_vehicle.set_autopilot(True)
+                self.vehicle_list.append(tmp_vehicle)
 
         seg_cam = self.blueprint_library.find("sensor.camera.semantic_segmentation")
         seg_cam.set_attribute("image_size_x", f"{IM_WIDTH}")
@@ -308,18 +301,21 @@ class CarEnv:
 
     def step(self, action):
         if action == 0:
-            if self.throttle_value <= 0.4:
+            if self.throttle_value <= 0.95:
                 self.throttle_value += 0.05
         elif action == 1:
-            if self.throttle_value >= 0.1:
+            if self.throttle_value >= 0.05:
                 self.throttle_value -= 0.05
         elif action == 2:
-            if self.handle_value >= -0.9:
+            if self.handle_value >= -0.95:
                 self.handle_value -= 0.05
         elif action == 3:
-            if self.handle_value <= 0.9:
+            if self.handle_value <= 0.95:
                 self.handle_value += 0.05
+        elif action == 4:
+            pass
 
+        # print(f'throttle: {self.throttle_value} steer" {self.handle_value}')
         self.vehicle.apply_control(carla.VehicleControl(throttle=self.throttle_value, steer=self.handle_value))
 
         if self.result:
@@ -330,17 +326,11 @@ class CarEnv:
 
         reward = 0
 
+        # 충돌 reward
         if len(self.collision_hist) != 0:
             done = True
             reward -= 500
         else:
-            # for hist in self.invasion_hist:
-            #     line_type = hist.crossed_lane_markings[0].type
-            #     if line_type == "Solid":
-            #         reward -= 200
-            #     if line_type == "SolidSolid":
-            #         reward -= 200
-
             waypoint = self.client.get_world().get_map().get_waypoint(self.vehicle.get_location(), project_to_road=True)
 
             vehicle_location = self.vehicle.get_location()
@@ -361,13 +351,26 @@ class CarEnv:
             )
             deltaAngle *= math.degrees(deltaAngle)
 
+            # 도로 중심으로 부터 거리 & 도로 방향과 차이 각도 reward
             distance = int(distance * 10)
             deltaAngle = int(deltaAngle)
 
             reward -= distance
             reward -= deltaAngle
 
-            reward += int(kmh * kmh / 100) * 10
+            # 차량 속도에 따른 reward
+            velocity_value = int(kmh * kmh / 100 - 1)
+            reward +=velocity_value
+
+            # 이동 거리에 따른 reward
+            mileage = math.sqrt(math.pow((vehicle_location.x - self.actor_start_point.location.x), 2)
+                                 + math.pow((vehicle_location.y - self.actor_start_point.location.y), 2)
+                                 + math.pow((vehicle_location.z - self.actor_start_point.location.z), 2))
+            mileage = int(mileage * 10)
+            reward += mileage
+
+            # print(f'distance -{distance} | deltaAngle -{deltaAngle} | velocity {velocity_value} | mileage {mileage}')
+
             done = False
 
         if self.episode_start + SECONDS_PER_EPISODE < time.time():
@@ -375,12 +378,13 @@ class CarEnv:
 
         return self.segmentation_camera, reward, done, None
 
-    def destroy_actors(self, bAll_Actors=False):
+    def destroy_actors(self):
         print(f'destroy actors({len(self.actor_list)})')
         # self.client.apply_batch([carla.command.DestroyActor(x) for x in self.actor_list])
-        if bAll_Actors:
-            self.client.apply_batch([carla.command.DestroyActor(x) for x in self.vehicle_list])
+        self.client.apply_batch([carla.command.DestroyActor(x) for x in self.vehicle_list])
 
-        else:
-            for actor in self.actor_list:
+        for actor in self.actor_list:
                 actor.destroy()
+
+        self.actor_list.clear()
+        self.vehicle_list.clear()
