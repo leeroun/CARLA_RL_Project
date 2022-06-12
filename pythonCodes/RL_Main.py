@@ -60,8 +60,16 @@ if __name__ == "__main__":
         time.sleep(0.01)
 
     print("Prediction 초기화")
-    # Prediction 초기화.
-    agent.get_qs(np.ones((env.im_height, env.im_width, 3)))
+    qs_left = np.ones((env.im_height, env.im_width, 3)).astype(np.float32)
+    qs_right = np.ones((env.im_height, env.im_width, 3)).astype(np.float32)
+    qs_front = np.ones((env.im_height, env.im_width, 3)).astype(np.float32)
+
+    qs_left_dis = np.ones(1).astype(np.float32)
+    qs_right_dis = np.ones(1).astype(np.float32)
+    qs_delta_angle = np.ones(1).astype(np.float32)
+    qs_left_type = [1, 0, 0, 0]
+    qs_right_type = [1, 0, 0, 0]
+    agent.get_qs([qs_left, qs_right, qs_front, [qs_left_dis, qs_right_dis, qs_delta_angle, qs_left_type, qs_right_type]])
 
     print("Start Learning")
     for episode in tqdm(range(1, EPISODE + 1), ascii=True, unit="episodes"):
@@ -86,7 +94,6 @@ if __name__ == "__main__":
             if np.random.random() > epsilon:  # epsilon 이상이면 기존 table 값 사용
                 action = np.argmax(agent.get_qs(current_state))
                 print(agent.get_qs(current_state))
-                print(action)
             else:  # epsilon 이하면 랜덤으로
                 action = np.random.randint(0, RL_Model.ACTION_NUMBER)
             time.sleep(1 / FPS)
