@@ -1,6 +1,5 @@
-from keras.layers import Conv2D, AveragePooling2D, Activation, Flatten, Dense, Concatenate, GlobalAveragePooling2D
+from keras.layers import  Dense, Concatenate, GlobalAveragePooling2D
 from keras.optimizers import Adam
-from keras.applications import Xception
 from keras.models import Sequential, Input, Model
 from keras.callbacks import TensorBoard
 
@@ -15,9 +14,7 @@ import carla
 import cv2
 import math
 
-IM_WIDTH = 640
-IM_HEIGHT = 480
-MIN_REPLAY_MEMORY_SIZE = 500
+MIN_REPLAY_MEMORY_SIZE = 1000
 MINIBATCH_SIZE = 16
 PREDICTION_BATCH_SIZE = 1
 TRAINING_BATCH_SIZE = MINIBATCH_SIZE // 4
@@ -30,8 +27,8 @@ DISCOUNT = 0.99
 
 SECONDS_PER_EPISODE = 10
 
-REPLAY_MEMORY_SIZE = 1_000
-MODEL_NAME = "CNN_SEG"
+REPLAY_MEMORY_SIZE = 5_000
+MODEL_NAME = "DNN_V1"
 SHOW_CAM = False
 
 
@@ -76,57 +73,18 @@ class DQNAgent:
         self.training_initialized = False
 
     def create_model(self):
-        in_image_left = Input(shape=(IM_HEIGHT, IM_WIDTH, 3))
-        in_image_right = Input(shape=(IM_HEIGHT, IM_WIDTH, 3))
-        in_image_front = Input(shape=(IM_HEIGHT, IM_WIDTH, 3))
-        in_lane = Input(
-            shape=(11,))  # left_dis (1) right_dis (1) delta angle (1) left lane type (4) right lane type (4)
+        input_shape = Input(shape=(16,))
+        # left_dis (1) right_dis (1) delta angle (1) left lane type (4) right lane type (4)
+        # Accel (1) Gyro_z (1)
+        # Left Dis (1) Front Dis (1) Right Dis (1)
 
-        out_left1 = Conv2D(64, kernel_size=3, strides=3, input_shape=(IM_HEIGHT, IM_WIDTH, 3), padding='same')(
-            in_image_left)
-        out_right1 = Conv2D(64, kernel_size=3, strides=3, input_shape=(IM_HEIGHT, IM_WIDTH, 3), padding='same')(
-            in_image_right)
-        out_front1 = Conv2D(64, kernel_size=3, strides=3, input_shape=(IM_HEIGHT, IM_WIDTH, 3), padding='same')(
-            in_image_front)
-        aout_left1 = Activation('relu')(out_left1)
-        aout_right1 = Activation('relu')(out_right1)
-        aout_front1 = Activation('relu')(out_front1)
-        pout_left1 = AveragePooling2D(pool_size=(5, 5), strides=(3, 3), padding='same')(aout_left1)
-        pout_right1 = AveragePooling2D(pool_size=(5, 5), strides=(3, 3), padding='same')(aout_right1)
-        pout_front1 = AveragePooling2D(pool_size=(5, 5), strides=(3, 3), padding='same')(aout_front1)
+        d1out = Dense(128, activation='relu')(input_shape)
+        d2out = Dense(64, activation='relu')(d1out)
+        d3out = Dense(32, activation='relu')(d2out)
+        d4out = Dense(16, activation='relu')(d3out)
+        dout = Dense(ACTION_NUMBER, activation='relu')(d4out)
 
-        out_left2 = Conv2D(64, kernel_size=3, strides=3, padding='same')(pout_left1)
-        out_right2 = Conv2D(64, kernel_size=3, strides=3, padding='same')(pout_right1)
-        out_front2 = Conv2D(64, kernel_size=3, strides=3, padding='same')(pout_front1)
-        aout_left2 = Activation('relu')(out_left2)
-        aout_right2 = Activation('relu')(out_right2)
-        aout_front2 = Activation('relu')(out_front2)
-        pout_left2 = AveragePooling2D(pool_size=(5, 5), strides=(3, 3), padding='same')(aout_left2)
-        pout_right2 = AveragePooling2D(pool_size=(5, 5), strides=(3, 3), padding='same')(aout_right2)
-        pout_front2 = AveragePooling2D(pool_size=(5, 5), strides=(3, 3), padding='same')(aout_front2)
-
-        out_left3 = Conv2D(64, kernel_size=3, strides=3, padding='same')(pout_left2)
-        out_right3 = Conv2D(64, kernel_size=3, strides=3, padding='same')(pout_right2)
-        out_front3 = Conv2D(64, kernel_size=3, strides=3, padding='same')(pout_front2)
-        aout_left3 = Activation('relu')(out_left3)
-        aout_right3 = Activation('relu')(out_right3)
-        aout_front3 = Activation('relu')(out_front3)
-        pout_left3 = AveragePooling2D(pool_size=(5, 5), strides=(3, 3), padding='same')(aout_left3)
-        pout_right3 = AveragePooling2D(pool_size=(5, 5), strides=(3, 3), padding='same')(aout_right3)
-        pout_front3 = AveragePooling2D(pool_size=(5, 5), strides=(3, 3), padding='same')(aout_front3)
-
-        fout_left = Flatten()(pout_left3)
-        fout_right = Flatten()(pout_right3)
-        fout_front = Flatten()(pout_front3)
-
-        out_lane1 = Dense(8, activation='relu')(in_lane)
-        out_lane2 = Dense(4, activation='relu')(out_lane1)
-        out_lane3 = Dense(1, activation='relu')(out_lane2)
-
-        out = Concatenate(axis=1)([fout_left, fout_right, fout_front, out_lane3])
-        dout = Dense(ACTION_NUMBER, activation='relu')(out)
-
-        model = Model(inputs=[in_image_left, in_image_right, in_image_front, in_lane], outputs=dout)
+        model = Model(inputs=input_shape, outputs=dout)
 
         model.compile(loss="mse", optimizer=Adam(lr=0.001), metrics=["accuracy"])
         model.summary()
@@ -138,31 +96,24 @@ class DQNAgent:
         current_transition = transition[0]
         new_transition = transition[3]
 
-        lane_list = [current_transition[3][0], current_transition[3][1], current_transition[3][2]]
-        lane_list += current_transition[3][3]
-        lane_list += current_transition[3][4]
-        cur_left = np.array(current_transition[0]).reshape(-1, *current_transition[0].shape)
-        cur_right = np.array(current_transition[1]).reshape(-1, *current_transition[1].shape)
-        cur_front = np.array(current_transition[2]).reshape(-1, *current_transition[2].shape)
-        cur_lane = np.array(lane_list)
-        cur_lane = np.expand_dims(cur_lane, axis=0)
+        cur_list = [current_transition[0], current_transition[1], current_transition[2],
+                current_transition[3][0], current_transition[3][1],  current_transition[3][2],  current_transition[3][3],
+                current_transition[4][0], current_transition[4][1],  current_transition[4][2],  current_transition[4][3],
+                current_transition[5], current_transition[6], current_transition[7][0], current_transition[7][1], current_transition[7][2]]
+        cur_list = np.expand_dims(cur_list, axis=0)
 
-        transition[0] = [cur_left, cur_right, cur_front, cur_lane]
+        transition[0] = [cur_list]
 
-        lane_list = [new_transition[3][0], new_transition[3][1], new_transition[3][2]]
-        lane_list += new_transition[3][3]
-        lane_list += new_transition[3][4]
-        new_left = np.array(new_transition[0]).reshape(-1, *new_transition[0].shape)
-        new_right = np.array(new_transition[1]).reshape(-1, *new_transition[1].shape)
-        new_front = np.array(new_transition[2]).reshape(-1, *new_transition[2].shape)
-        new_lane = np.array(lane_list)
-        new_lane = np.expand_dims(new_lane, axis=0)
+        new_list = [new_transition[0], new_transition[1], new_transition[2],
+                new_transition[3][0], new_transition[3][1],  new_transition[3][2],  new_transition[3][3],
+                new_transition[4][0], new_transition[4][1],  new_transition[4][2],  new_transition[4][3],
+                new_transition[5], new_transition[6], new_transition[7][0], new_transition[7][1], new_transition[7][2]]
+        new_list = np.expand_dims(new_list, axis=0)
 
-        transition[3] = [new_left, new_right, new_front, new_lane]
+        transition[3] = [new_list]
 
         self.replay_memory.append(transition)
-        print(f'replay memory length : {len(self.replay_memory)}')
-
+        # print(f'replay memory length : {len(self.replay_memory)} / {REPLAY_MEMORY_SIZE}')
 
     def train(self):
         if len(self.replay_memory) < MIN_REPLAY_MEMORY_SIZE:
@@ -218,38 +169,39 @@ class DQNAgent:
             self.target_update_counter = 0
 
     def get_qs(self, state):
-        lane_list = [state[3][0], state[3][1], state[3][2]]
-        lane_list += state[3][3]
-        lane_list += state[3][4]
-        # [self.left_seg_camera, self.right_seg_camera, self.front_seg_camera, [lane_left_dis, lane_right_dis, lane_delta_angle, lane_left_type, lane_right_type]]
-        qs_left = np.array(state[0]).reshape(-1, *state[0].shape)
-        qs_right = np.array(state[1]).reshape(-1, *state[1].shape)
-        qs_front = np.array(state[2]).reshape(-1, *state[2].shape)
-        qs_lane = np.array(lane_list)
-        qs_lane = np.expand_dims(qs_lane, axis=0)
+        # [0]left_dis (1) [1]right_dis (1) [2]delta angle (1) [3]left lane type (4) [4]right lane type (4)
+        # [5]Accel (1) [6]Gyro_z (1)
+        # [7]Dis (3) [Left Front Right]
+        list = [state[0], state[1], state[2],
+                state[3][0], state[3][1],  state[3][2],  state[3][3],
+                state[4][0], state[4][1],  state[4][2],  state[4][3],
+                state[5], state[6], state[7][0], state[7][1], state[7][2]]
+        qs_list = np.expand_dims(list, axis=0)
 
-        return self.model.predict([qs_left, qs_right, qs_front, qs_lane])[0]
+        return self.model.predict([qs_list])[0]
 
     def train_in_loop(self):
-        X_image_f = np.random.uniform(size=(1, IM_HEIGHT, IM_WIDTH, 3)).astype(np.float32)
-        X_image_l = np.random.uniform(size=(1, IM_HEIGHT, IM_WIDTH, 3)).astype(np.float32)
-        X_image_r = np.random.uniform(size=(1, IM_HEIGHT, IM_WIDTH, 3)).astype(np.float32)
+        # left_dis (1) right_dis (1) delta angle (1) left lane type (4) right lane type (4)
+        # Accel (1) Gyro (3)
+        # Dis (3) [Left Front Right]
 
         X_left_dis = np.random.uniform(size=1).astype(np.float32)
         X_right_dis = np.random.uniform(size=1).astype(np.float32)
+        X_delta_angle = np.random.uniform(size=1).astype(np.float32)
         X_left_type = np.eye(4)[np.random.randint(0, 4)].astype(np.float32)
         X_right_type = np.eye(4)[np.random.randint(0, 4)].astype(np.float32)
-        X_delta_angle = np.random.uniform(size=1).astype(np.float32)
+        X_accel = np.random.uniform(size=1).astype(np.float32)
+        X_gyro = np.random.uniform(size=1).astype(np.float32)
+        X_dis = np.random.uniform(size=3).astype(np.float32)
 
-        # left_dis (1) right_dis (1) delta angle (1) left lane type (4) right lane type (4)
-        X_lane = np.concatenate((X_left_dis, X_right_dis, X_delta_angle, X_left_type, X_right_type))
-        X_lane = np.expand_dims(X_lane, axis=0)
+        X = np.concatenate((X_left_dis, X_right_dis, X_delta_angle, X_left_type, X_right_type, X_accel, X_gyro, X_dis))
+        X = np.expand_dims(X, axis=0)
 
         # X = np.array([X_image_f, X_image_l, X_image_r, X_lane])
         y = np.random.uniform(size=(1, ACTION_NUMBER)).astype(np.float32)
 
         with self.graph.as_default():
-            self.model.fit([X_image_f, X_image_l, X_image_r, X_lane], y, verbose=False, batch_size=1)
+            self.model.fit(X, y, verbose=False, batch_size=1)
 
         self.training_initialized = True
         while True:
@@ -260,11 +212,6 @@ class DQNAgent:
 
 
 class CarEnv:
-    im_width = IM_WIDTH
-    im_height = IM_HEIGHT
-    front_seg_camera = None
-    left_seg_camera = None
-    right_seg_camera = None
 
     def __init__(self, result=False):
         self.client = carla.Client('localhost', 2000)
@@ -281,27 +228,33 @@ class CarEnv:
 
         self.episode_start = 0
 
+        self.left_distance = 0
+        self.right_distance = 0
+        self.front_distance = 0
+
+        self.accel = 0
+        self.gyro_z = 0
+
         # self.spawn_points = self.world.get_map().get_spawn_points()
         self.spawn_points = []  # world.get_map().get_spawn_points()
 
-        self.actor_start_point = carla.Transform(carla.Location(-30, -57.5, 0.6), carla.Rotation(0, 0, 0))  # actor spawn point
+        self.actor_start_point = carla.Transform(carla.Location(0, -57.5, 0.6),
+                                                 carla.Rotation(0, 0, 0))  # actor spawn point
+
+        self.spawn_points.append(carla.Transform(carla.Location(-30, -57.5, 0.6), carla.Rotation(0, 0, 0)))
         self.spawn_points.append(carla.Transform(carla.Location(-10, -57.5, 0.6), carla.Rotation(0, 0, 0)))
         self.spawn_points.append(carla.Transform(carla.Location(18, -57.5, 0.6), carla.Rotation(0, 0, 0)))
         self.spawn_points.append(carla.Transform(carla.Location(45, -57.5, 0.6), carla.Rotation(0, 0, 0)))
         self.spawn_points.append(carla.Transform(carla.Location(-20, -60.5, 0.6), carla.Rotation(0, 0, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(11, -60.5, 0.6), carla.Rotation(0, 0, 0)))
         self.spawn_points.append(carla.Transform(carla.Location(29, -60.5, 0.6), carla.Rotation(0, 0, 0)))
 
-        self.spawn_points.append(carla.Transform(carla.Location(-14, -68.3, 0.6), carla.Rotation(0, 180, 0)))
         self.spawn_points.append(carla.Transform(carla.Location(0, -68.3, 0.6), carla.Rotation(0, 180, 0)))
         self.spawn_points.append(carla.Transform(carla.Location(10, -68.3, 0.6), carla.Rotation(0, 180, 0)))
         self.spawn_points.append(carla.Transform(carla.Location(29, -68.3, 0.6), carla.Rotation(0, 180, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(45, -68.3, 0.6), carla.Rotation(0, 180, 0)))
         self.spawn_points.append(carla.Transform(carla.Location(55, -68.3, 0.6), carla.Rotation(0, 180, 0)))
         self.spawn_points.append(carla.Transform(carla.Location(-10, -64.7, 0.6), carla.Rotation(0, 180, 0)))
         self.spawn_points.append(carla.Transform(carla.Location(3, -64.7, 0.6), carla.Rotation(0, 180, 0)))
         self.spawn_points.append(carla.Transform(carla.Location(21, -64.7, 0.6), carla.Rotation(0, 180, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(30, -64.7, 0.6), carla.Rotation(0, 180, 0)))
         self.spawn_points.append(carla.Transform(carla.Location(38, -64.7, 0.6), carla.Rotation(0, 180, 0)))
         self.spawn_points.append(carla.Transform(carla.Location(48, -64.7, 0.6), carla.Rotation(0, 180, 0)))
 
@@ -337,7 +290,6 @@ class CarEnv:
         print('reset environment')
 
         self.collision_hist = []
-        self.invasion_hist = []
         self.actor_list = []
         self.vehicle_list = []
 
@@ -355,39 +307,26 @@ class CarEnv:
                 tmp_vehicle.set_autopilot(True)
                 self.vehicle_list.append(tmp_vehicle)
 
-        seg_cam = self.blueprint_library.find("sensor.camera.semantic_segmentation")
-        seg_cam.set_attribute("image_size_x", f"{IM_WIDTH}")
-        seg_cam.set_attribute("image_size_y", f"{IM_HEIGHT}")
-        seg_cam.set_attribute("fov", f"110")
-
-        front_spawn_point = carla.Transform(carla.Location(x=2.5, z=0.4))
-        left_spawn_point = carla.Transform(carla.Location(x=2.5, z=0.5), carla.Rotation(0, -45, 0))
-        right_spawn_point = carla.Transform(carla.Location(x=2.5, z=0.6), carla.Rotation(0, 45, 0))
-
-        front_seg_sensor = self.world.spawn_actor(seg_cam, front_spawn_point, attach_to=self.vehicle)
-        self.actor_list.append(front_seg_sensor)
-        front_seg_sensor.listen(lambda data: self.process_segmentation_img(data, 0))
-
-        left_seg_sensor = self.world.spawn_actor(seg_cam, left_spawn_point, attach_to=self.vehicle)
-        self.actor_list.append(left_seg_sensor)
-        left_seg_sensor.listen(lambda data: self.process_segmentation_img(data, 1))
-
-        right_seg_sensor = self.world.spawn_actor(seg_cam, right_spawn_point, attach_to=self.vehicle)
-        self.actor_list.append(right_seg_sensor)
-        right_seg_sensor.listen(lambda data: self.process_segmentation_img(data, 2))
-
         col_sensor_bp = self.blueprint_library.find("sensor.other.collision")
         col_sensor = self.world.spawn_actor(col_sensor_bp, carla.Transform(), attach_to=self.vehicle)
         self.actor_list.append(col_sensor)
         col_sensor.listen(lambda event: self.collision_data(event))
 
-        line_sensor_bp = self.blueprint_library.find("sensor.other.lane_invasion")
-        line_sensor = self.world.spawn_actor(line_sensor_bp, carla.Transform(), attach_to=self.vehicle)
-        self.actor_list.append(line_sensor)
-        line_sensor.listen(lambda event: self.on_invasion(event))
+        radar_sensor_bp = self.blueprint_library.find('sensor.other.radar')
+        radar_sensor_bp.set_attribute('horizontal_fov', '110')
+        radar_sensor_bp.set_attribute('vertical_fov', '15')
+        radar_sensor_bp.set_attribute('range', '8')
+        rad_loc = carla.Location(x=2.0, z=1.0)
+        rad_rot = carla.Rotation(pitch=5)
+        radar_sensor = self.world.spawn_actor(radar_sensor_bp, carla.Transform(rad_loc, rad_rot),
+                                              attach_to=self.vehicle)
+        radar_sensor.listen(lambda data: self.radar_callback(data))
+        self.actor_list.append(radar_sensor)
 
-        while self.front_seg_camera is None or self.left_seg_camera is None or self.right_seg_camera is None:
-            time.sleep(0.01)
+        IMU_sensor_bp = self.blueprint_library.find('sensor.other.imu')
+        IMU_sensor = self.world.spawn_actor(IMU_sensor_bp, carla.Transform(), attach_to=self.vehicle)
+        IMU_sensor.listen(lambda data: self.IMU_callback(data))
+        self.actor_list.append(IMU_sensor)
 
         self.episode_start = time.time()
         self.vehicle.apply_control(carla.VehicleControl(throttle=1.0, steer=0.0))
@@ -396,9 +335,11 @@ class CarEnv:
 
     def get_state(self):
         lane_left_dis = 0
-        lane_left_type = [0, 0, 0, 1]
+        lane_left_type = [1, 0, 0, 0]
         lane_right_dis = 0
-        lane_right_type = [0, 0, 0, 1]
+        lane_right_type = [1, 0, 0, 0]
+        imu_gyro = 0
+        sensing_distance = [0, 0, 0]
 
         waypoint = self.client.get_world().get_map().get_waypoint(self.vehicle.get_location(), project_to_road=True)
         vehicle_location = self.vehicle.get_location()
@@ -444,30 +385,93 @@ class CarEnv:
 
         lane_delta_angle /= 180
 
+        imu_accel = min(self.accel, 50)/50
+
+        imu_gyro = (math.degrees(self.gyro_z)+90)/180
+
+        sensing_distance[0] = self.left_distance / 10
+        sensing_distance[1] = self.front_distance / 10
+        sensing_distance[2] = self.right_distance / 10
+
+        # print(f'Lane Left Dist {lane_left_dis} | Lane Right Dist {lane_right_dis} | Lane Delta Angle {lane_delta_angle}')
+        # print(f'Lane Left Type {lane_left_type} | Lane Right Type {lane_right_type}')
+        # print(f'Accel {imu_accel} | Gyro {imu_gyro}')
+        # print(f'Sensing Distance {sensing_distance}')
+
         # left_dis (1) right_dis (1) delta angle (1) left lane type (4) right lane type (4)
-        return [self.left_seg_camera, self.right_seg_camera, self.front_seg_camera,
-                [lane_left_dis, lane_right_dis, lane_delta_angle, lane_left_type, lane_right_type]]
+        # Accel (1) Gyro_z (1)
+        # Left Dis (1) Front Dis (1) Right Dis (1)
+        return [lane_left_dis, lane_right_dis, lane_delta_angle, lane_left_type, lane_right_type, imu_accel, imu_gyro, sensing_distance]
 
     def collision_data(self, event):
         self.collision_hist.append(event)
 
-    def on_invasion(self, event):
-        self.invasion_hist.append(event)
+    def radar_callback(self, data):
+        if not self.vehicle.is_alive:
+            return
+        current_rot = data.transform.rotation
+        vehicle_location = self.vehicle.get_transform().location
+        vehicle_forward = self.vehicle.get_transform().get_forward_vector()
 
-    def process_segmentation_img(self, image, dir):
-        image.convert(carla.ColorConverter.CityScapesPalette)
-        i = np.array(image.raw_data) / 255
-        i2 = i.reshape((IM_HEIGHT, IM_WIDTH, 4))
-        i3 = i2[:, :, :3]
-        if SHOW_CAM and dir == 0:
-            cv2.imshow("", i3)
-            cv2.waitKey(1)
-        if dir == 0:
-            self.front_seg_camera = i3
-        elif dir == 1:
-            self.left_seg_camera = i3
-        elif dir == 2:
-            self.right_seg_camera = i3
+        left_list = []
+        right_list = []
+        front_list = []
+
+        for detect in data:
+            azi = math.degrees(detect.azimuth)
+            alt = math.degrees(detect.altitude)
+            forward = carla.Vector3D(x=detect.depth - 0.25)
+
+            carla.Transform(
+                carla.Location(),
+                carla.Rotation(
+                    pitch=current_rot.pitch + alt,
+                    yaw=current_rot.yaw + azi,
+                    roll=current_rot.roll)).transform(forward)
+
+            detect_transform = data.transform.location + forward
+
+            detect_vector = carla.Vector3D(detect_transform.x - vehicle_location.x,
+                                           detect_transform.y - vehicle_location.y,
+                                           detect_transform.z - vehicle_location.z)
+
+            distance = math.sqrt(math.pow(detect_vector.x, 2)
+                                 + math.pow(detect_vector.y, 2)
+                                 + math.pow(detect_vector.z, 2))
+
+            deltaAngle = math.acos(
+                (vehicle_forward.x * detect_vector.x + vehicle_forward.y * detect_vector.y + vehicle_forward.z * detect_vector.z) /
+                math.sqrt(vehicle_forward.x * vehicle_forward.x + vehicle_forward.y * vehicle_forward.y + vehicle_forward.z * vehicle_forward.z) /
+                math.sqrt(detect_vector.x * detect_vector.x + detect_vector.y * detect_vector.y + detect_vector.z * detect_vector.z)
+            )
+
+            if np.cross([vehicle_forward.x, vehicle_forward.y, vehicle_forward.z],
+                        [detect_vector.x, detect_vector.y, detect_vector.z])[2] > 0:
+                sign = 1
+            else:
+                sign = 0
+
+            deltaAngle *= math.degrees(deltaAngle)
+
+            if deltaAngle > 10:
+                if sign > 0:
+                    right_list.append(distance)
+                else:
+                    left_list.append(distance)
+            else:
+                front_list.append(distance)
+
+        if len(left_list) != 0:
+            self.left_distance = np.mean(left_list)
+        if len(right_list) != 0:
+            self.right_distance = np.mean(right_list)
+        if len(front_list) != 0:
+            self.front_distance = np.mean(front_list)
+
+    def IMU_callback(self, data):
+        accel_value = math.sqrt(data.accelerometer.x * data.accelerometer.x + data.accelerometer.y * data.accelerometer.y + data.accelerometer.z *data.accelerometer.z)
+        self.accel = accel_value
+        self.gyro_z = data.gyroscope.z
 
     def lane_type_to_onehot_Vector(self, lane_type):
         if lane_type is carla.LaneMarkingType.Broken:
@@ -480,23 +484,19 @@ class CarEnv:
             return [0.0, 0.0, 0.0, 1.0]
 
     def step(self, action):
+        brake_value = 0
         if action == 0:
-            if self.throttle_value <= 0.95:
-                self.throttle_value += 0.05
+            self.throttle_value = 0.5
         elif action == 1:
-            if self.throttle_value >= 0.05:
-                self.throttle_value -= 0.05
+            self.handle_value = -1
         elif action == 2:
-            if self.handle_value >= -0.95:
-                self.handle_value -= 0.05
+            self.handle_value = 1
         elif action == 3:
-            if self.handle_value <= 0.95:
-                self.handle_value += 0.05
-        elif action == 4:
-            pass
+            brake_value = 1
 
         # print(f'throttle: {self.throttle_value} steer" {self.handle_value}')
-        self.vehicle.apply_control(carla.VehicleControl(throttle=self.throttle_value, steer=self.handle_value))
+        self.vehicle.apply_control(
+            carla.VehicleControl(throttle=self.throttle_value, steer=self.handle_value, brake=brake_value))
 
         if self.result:
             return self.get_state(), 0, False, None
@@ -509,33 +509,35 @@ class CarEnv:
         # 충돌 reward
         if len(self.collision_hist) != 0:
             done = True
-            reward -= 500
+            reward -= 200
         else:
-            # waypoint = self.client.get_world().get_map().get_waypoint(self.vehicle.get_location(), project_to_road=True)
-            #
+
+            waypoint_location = self.client.get_world().get_map().get_waypoint(self.vehicle.get_location(),
+                                                                               project_to_road=True).transform.location
             vehicle_location = self.vehicle.get_location()
-            # waypoint_location = waypoint.transform.location
-            # distance = math.sqrt(math.pow((vehicle_location.x - waypoint_location.x), 2)
-            #                      + math.pow((vehicle_location.y - waypoint_location.y), 2)
-            #                      + math.pow((vehicle_location.z - waypoint_location.z), 2))
-            #
-            # # 도로 중심으로 부터 거리 & 도로 방향과 차이 각도 reward
-            # distance = int(distance * 10)
-            #
-            # reward -= distance
+            distance = math.sqrt(math.pow((vehicle_location.x - waypoint_location.x), 2)
+                                 + math.pow((vehicle_location.y - waypoint_location.y), 2)
+                                 + math.pow((vehicle_location.z - waypoint_location.z), 2))
+
+            distance_value = int(distance / 4)
+            reward -= distance_value
 
             # 차량 속도에 따른 reward
-            velocity_value = int(kmh * kmh / 100 - 1)
+            # velocity_value = int(kmh * math.sqrt(kmh) / 50 - (1 / 2))  # 9kmh 전까진 -1, 50kmh에서 대략 6정도
+            # velocity_value = int(5 * math.log(kmh+1) - 5)  # 10kmh 전까진 -1, 50kmh에서 대략 3정도
+            velocity_value = int(kmh / 5 - 1)  # 10kmh 전까진 -1, 50kmh에서 4
+
             reward += velocity_value
 
             # 이동 거리에 따른 reward
             mileage = math.sqrt(math.pow((vehicle_location.x - self.actor_start_point.location.x), 2)
                                 + math.pow((vehicle_location.y - self.actor_start_point.location.y), 2)
                                 + math.pow((vehicle_location.z - self.actor_start_point.location.z), 2))
-            mileage = int(mileage * 10)
-            reward += mileage
+            # mileage_value = int(mileage / 5)  # 직선 거리 40 정도.
+            mileage_value = int(mileage * math.sqrt(mileage) / 20)  # 직선 거리 40 정도.
+            reward += mileage_value
 
-            # print(f'distance -{distance} | deltaAngle -{deltaAngle} | velocity {velocity_value} | mileage {mileage}')
+            # print(f'velocity {velocity_value} | mileage {mileage_value} | distance {distance_value}')
 
             done = False
 

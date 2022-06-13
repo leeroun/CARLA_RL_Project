@@ -1,7 +1,7 @@
 import numpy as np
 import RL_Model
 
-WEIGHTS_NAME = 'CNN_SEG_weights_1654899490'
+WEIGHTS_NAME = 'CNN_SEG_V1_weights_1655056181'
 agent = RL_Model.DQNAgent()
 agent.model.load_weights('models/'+WEIGHTS_NAME)
 

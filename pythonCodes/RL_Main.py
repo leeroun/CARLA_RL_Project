@@ -24,10 +24,10 @@ from tqdm import tqdm
 
 MEMORY_FRACTION = 0.8
 AGGREGATE_STATS_EVERY = 10
-EPISODE = 1000
+EPISODE = 10000
 MIN_REWARD = -200
 
-EPSILON_DECAY = 0.995
+EPSILON_DECAY = 0.9995
 MIN_EPSILON = 0.001
 epsilon = 1
 
@@ -60,16 +60,20 @@ if __name__ == "__main__":
         time.sleep(0.01)
 
     print("Prediction 초기화")
-    qs_left = np.ones((env.im_height, env.im_width, 3)).astype(np.float32)
-    qs_right = np.ones((env.im_height, env.im_width, 3)).astype(np.float32)
-    qs_front = np.ones((env.im_height, env.im_width, 3)).astype(np.float32)
 
+    # left_dis (1) right_dis (1) delta angle (1) left lane type (4) right lane type (4)
+    # Accel (1) Gyro (3)
+    # Dis (3) [Left Front Right]
     qs_left_dis = np.ones(1).astype(np.float32)
     qs_right_dis = np.ones(1).astype(np.float32)
     qs_delta_angle = np.ones(1).astype(np.float32)
     qs_left_type = [1, 0, 0, 0]
     qs_right_type = [1, 0, 0, 0]
-    agent.get_qs([qs_left, qs_right, qs_front, [qs_left_dis, qs_right_dis, qs_delta_angle, qs_left_type, qs_right_type]])
+    qs_accel = np.ones(1).astype(np.float32)
+    qs_gyro = 1
+    qs_dis = [1, 1, 1]
+
+    agent.get_qs([qs_left_dis, qs_right_dis, qs_delta_angle, qs_left_type, qs_right_type, qs_accel, qs_gyro, qs_dis])
 
     print("Start Learning")
     for episode in tqdm(range(1, EPISODE + 1), ascii=True, unit="episodes"):
@@ -136,4 +140,9 @@ if __name__ == "__main__":
     trainer_thread.join()
     print(f'saved model in (models/{RL_Model.MODEL_NAME}_weights_{int(time.time())}')
     agent.model.save_weights(f'models/{RL_Model.MODEL_NAME}_weights_{int(time.time())}')
-    env.destroy_actors(True)
+    env.destroy_actors( )
+
+    with open("file.txt", 'w') as f:
+        for reward in ep_rewards:
+            f.write(str(reward) + '\n')
+
