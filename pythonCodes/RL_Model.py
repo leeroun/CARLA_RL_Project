@@ -21,14 +21,14 @@ TRAINING_BATCH_SIZE = MINIBATCH_SIZE // 4
 UPDATE_TARGET_EVERY = 5
 
 MODEL_INPUTS = 5
-ACTION_NUMBER = 5
+ACTION_NUMBER = 4
 
 DISCOUNT = 0.99
 
-SECONDS_PER_EPISODE = 10
+SECONDS_PER_EPISODE = 15
 
 REPLAY_MEMORY_SIZE = 5_000
-MODEL_NAME = "DNN_V1"
+MODEL_NAME = "DNN_V2_l2_A4"
 SHOW_CAM = False
 
 
@@ -78,11 +78,9 @@ class DQNAgent:
         # Accel (1) Gyro_z (1)
         # Left Dis (1) Front Dis (1) Right Dis (1)
 
-        d1out = Dense(128, activation='relu')(input_shape)
-        d2out = Dense(64, activation='relu')(d1out)
-        d3out = Dense(32, activation='relu')(d2out)
-        d4out = Dense(16, activation='relu')(d3out)
-        dout = Dense(ACTION_NUMBER, activation='relu')(d4out)
+        d1out = Dense(32, activation='relu')(input_shape)
+        d2out = Dense(16, activation='relu')(d1out)
+        dout = Dense(ACTION_NUMBER, activation='linear')(d2out)
 
         model = Model(inputs=input_shape, outputs=dout)
 
@@ -235,74 +233,34 @@ class CarEnv:
         self.accel = 0
         self.gyro_z = 0
 
-        # self.spawn_points = self.world.get_map().get_spawn_points()
-        self.spawn_points = []  # world.get_map().get_spawn_points()
+        self.spawn_points = self.world.get_map().get_spawn_points()
+        self.actor_start_point = carla.Transform()
 
-        self.actor_start_point = carla.Transform(carla.Location(0, -57.5, 0.6),
-                                                 carla.Rotation(0, 0, 0))  # actor spawn point
-
-        self.spawn_points.append(carla.Transform(carla.Location(-30, -57.5, 0.6), carla.Rotation(0, 0, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(-10, -57.5, 0.6), carla.Rotation(0, 0, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(18, -57.5, 0.6), carla.Rotation(0, 0, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(45, -57.5, 0.6), carla.Rotation(0, 0, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(-20, -60.5, 0.6), carla.Rotation(0, 0, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(29, -60.5, 0.6), carla.Rotation(0, 0, 0)))
-
-        self.spawn_points.append(carla.Transform(carla.Location(0, -68.3, 0.6), carla.Rotation(0, 180, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(10, -68.3, 0.6), carla.Rotation(0, 180, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(29, -68.3, 0.6), carla.Rotation(0, 180, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(55, -68.3, 0.6), carla.Rotation(0, 180, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(-10, -64.7, 0.6), carla.Rotation(0, 180, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(3, -64.7, 0.6), carla.Rotation(0, 180, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(21, -64.7, 0.6), carla.Rotation(0, 180, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(38, -64.7, 0.6), carla.Rotation(0, 180, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(48, -64.7, 0.6), carla.Rotation(0, 180, 0)))
-
-        self.spawn_points.append(carla.Transform(carla.Location(-42, -30, 0.6), carla.Rotation(0, -90, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(-42, -10, 0.6), carla.Rotation(0, -90, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(-42, 5, 0.6), carla.Rotation(0, -90, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(-45.5, -25, 0.6), carla.Rotation(0, -90, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(-45.5, -5, 0.6), carla.Rotation(0, -90, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(-45.5, 10, 0.6), carla.Rotation(0, -90, 0)))
-
-        self.spawn_points.append(carla.Transform(carla.Location(106.5, -17, 0.6), carla.Rotation(0, -90, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(106.5, -5, 0.6), carla.Rotation(0, -90, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(106.5, 0, 0.6), carla.Rotation(0, -90, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(106.5, 10, 0.6), carla.Rotation(0, -90, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(110, -15, 0.6), carla.Rotation(0, -90, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(110, -5, 0.6), carla.Rotation(0, -90, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(110, 10, 0.6), carla.Rotation(0, -90, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(110, 5, 0.6), carla.Rotation(0, -90, 0)))
-
-        self.spawn_points.append(carla.Transform(carla.Location(106.5, 45, 0.6), carla.Rotation(0, -90, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(106.5, 55, 0.6), carla.Rotation(0, -90, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(106.5, 65, 0.6), carla.Rotation(0, -90, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(106.5, 75, 0.6), carla.Rotation(0, -90, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(110, 45, 0.6), carla.Rotation(0, -90, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(110, 55, 0.6), carla.Rotation(0, -90, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(110, 65, 0.6), carla.Rotation(0, -90, 0)))
-        self.spawn_points.append(carla.Transform(carla.Location(110, 75, 0.6), carla.Rotation(0, -90, 0)))
-
-        self.world.get_spectator().set_transform(self.actor_start_point)
         self.vehicle_blueprints = self.blueprint_library.filter('*vehicle*')
 
     def reset(self):
-        print('reset environment')
 
         self.collision_hist = []
         self.actor_list = []
         self.vehicle_list = []
 
-        print('-spawn actor')
         while True:
-            self.vehicle = self.world.try_spawn_actor(self.model_3, self.actor_start_point)
+            vehicle_transform = random.choice(self.spawn_points)
+            self.actor_start_point = vehicle_transform
+            self.vehicle = self.world.try_spawn_actor(self.model_3, vehicle_transform)
+
+            spec_loc = carla.Location(-7, 0, 6)
+            vehicle_transform.transform(spec_loc)
+            spectator_transform = carla.Transform(carla.Location(spec_loc.x, spec_loc.y, spec_loc.z),
+                                                  carla.Rotation(pitch=vehicle_transform.rotation.pitch-25, yaw=vehicle_transform.rotation.yaw, roll=vehicle_transform.rotation.roll))
+
+            self.world.get_spectator().set_transform(spectator_transform)
             if self.vehicle is not None:
                 self.actor_list.append(self.vehicle)
                 break
 
-        print('-spawn vehicles')
-        for i in range(0, len(self.spawn_points)):
-            tmp_vehicle = self.world.try_spawn_actor(random.choice(self.vehicle_blueprints), self.spawn_points[i])
+        for i in range(0, 150):
+            tmp_vehicle = self.world.try_spawn_actor(random.choice(self.vehicle_blueprints), random.choice(self.spawn_points))
             if tmp_vehicle is not None:
                 tmp_vehicle.set_autopilot(True)
                 self.vehicle_list.append(tmp_vehicle)
@@ -338,7 +296,6 @@ class CarEnv:
         lane_left_type = [1, 0, 0, 0]
         lane_right_dis = 0
         lane_right_type = [1, 0, 0, 0]
-        imu_gyro = 0
         sensing_distance = [0, 0, 0]
 
         waypoint = self.client.get_world().get_map().get_waypoint(self.vehicle.get_location(), project_to_road=True)
@@ -525,7 +482,7 @@ class CarEnv:
             # 차량 속도에 따른 reward
             # velocity_value = int(kmh * math.sqrt(kmh) / 50 - (1 / 2))  # 9kmh 전까진 -1, 50kmh에서 대략 6정도
             # velocity_value = int(5 * math.log(kmh+1) - 5)  # 10kmh 전까진 -1, 50kmh에서 대략 3정도
-            velocity_value = int(kmh / 5 - 1)  # 10kmh 전까진 -1, 50kmh에서 4
+            velocity_value = int(kmh / 10 - 3)
 
             reward += velocity_value
 
@@ -533,11 +490,10 @@ class CarEnv:
             mileage = math.sqrt(math.pow((vehicle_location.x - self.actor_start_point.location.x), 2)
                                 + math.pow((vehicle_location.y - self.actor_start_point.location.y), 2)
                                 + math.pow((vehicle_location.z - self.actor_start_point.location.z), 2))
-            # mileage_value = int(mileage / 5)  # 직선 거리 40 정도.
-            mileage_value = int(mileage * math.sqrt(mileage) / 20)  # 직선 거리 40 정도.
+            mileage_value = int(mileage * math.sqrt(mileage) / 40 - 1)
             reward += mileage_value
 
-            # print(f'velocity {velocity_value} | mileage {mileage_value} | distance {distance_value}')
+            # print(f'velocity {velocity_value} | mileage {mileage_value} | distance -{distance_value}')
 
             done = False
 
@@ -547,7 +503,8 @@ class CarEnv:
         return self.get_state(), reward, done, None
 
     def destroy_actors(self):
-        print(f'destroy actors({len(self.actor_list)})')
+        # print(f'destroy actors({len(self.actor_list)})')
+        # print(f'destroy vehicles({len(self.vehicle_list)})')
         # self.client.apply_batch([carla.command.DestroyActor(x) for x in self.actor_list])
         self.client.apply_batch([carla.command.DestroyActor(x) for x in self.vehicle_list])
 

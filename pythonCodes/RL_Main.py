@@ -24,11 +24,11 @@ from tqdm import tqdm
 
 MEMORY_FRACTION = 0.8
 AGGREGATE_STATS_EVERY = 10
-EPISODE = 10000
+EPISODE = 1000
 MIN_REWARD = -200
 
-EPSILON_DECAY = 0.9995
-MIN_EPSILON = 0.001
+EPSILON_DECAY = 0.9999
+MIN_EPSILON = 0.05
 epsilon = 1
 
 if __name__ == "__main__":
@@ -126,8 +126,12 @@ if __name__ == "__main__":
 
             # 모델 저장
             if episode % 100 == 0:
-                print(f'saved model in (models/{RL_Model.MODEL_NAME}_weights_{int(time.time())}')
-                agent.model.save_weights(f'models/{RL_Model.MODEL_NAME}_weights_{int(time.time())}')
+                try:
+                    print(f'saved model in (models/{RL_Model.MODEL_NAME}_episode_{episode}')
+                    agent.model.save_weights(f'models/{RL_Model.MODEL_NAME}_episode_{episode}')
+                except OSError:
+                    print(OSError)
+                    print(f'save model fail in episode {episode}')
             # agent.model.save(
             #     f'models/{RL_Model.MODEL_NAME}__{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.h5')
 
@@ -140,9 +144,7 @@ if __name__ == "__main__":
     trainer_thread.join()
     print(f'saved model in (models/{RL_Model.MODEL_NAME}_weights_{int(time.time())}')
     agent.model.save_weights(f'models/{RL_Model.MODEL_NAME}_weights_{int(time.time())}')
-    env.destroy_actors( )
 
     with open("file.txt", 'w') as f:
         for reward in ep_rewards:
             f.write(str(reward) + '\n')
-

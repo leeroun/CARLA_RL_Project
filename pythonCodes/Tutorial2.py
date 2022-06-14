@@ -174,7 +174,7 @@ def main():
     bp_library = world.get_blueprint_library()
     bp = bp_library.filter("model3")[0]
 
-    spawn_points = [carla.Transform(carla.Location(-30, -60.5, 0.6), carla.Rotation(0, 0, 0)),
+    spawn_points = [carla.Transform(carla.Location(-30, -60.8, 0.6), carla.Rotation(0, 0, 0)),
                     carla.Transform(carla.Location(10, -57.5, 0.6), carla.Rotation(0, 0, 0)),
                     carla.Transform(carla.Location(10, -60.5, 0.6), carla.Rotation(0, 0, 0)),
                     carla.Transform(carla.Location(10, -64.7, 0.6), carla.Rotation(0, 0, 0))]
@@ -225,7 +225,7 @@ def main():
     print(f'0: {spawn_points[0]}')
     # vehicle.set_autopilot(True)
 
-    vehicle.apply_control(carla.VehicleControl(throttle=0, steer=0))
+    vehicle.apply_control(carla.VehicleControl(throttle=0, steer=1))
     actor_list.append(vehicle)
 
     # 다른 vehicle 생성
@@ -309,7 +309,7 @@ def main():
     line_sensor.listen(lambda event: on_invasion(event))
 
     radar_sensor_bp = bp_library.find('sensor.other.radar')
-    radar_sensor_bp.set_attribute('horizontal_fov', '110')
+    radar_sensor_bp.set_attribute('horizontal_fov', '130')
     radar_sensor_bp.set_attribute('vertical_fov', '15')
     radar_sensor_bp.set_attribute('range', '8')
     rad_loc = carla.Location(x=2.0, z=1.0)
@@ -325,7 +325,7 @@ def main():
 
 
     cnt = 0
-    throValue = 0.5
+    throValue = 0
     handleValue = 0
 
     print('start')
@@ -337,13 +337,6 @@ def main():
 
         v = vehicle.get_velocity()
         kmh = int(3.6 * math.sqrt(v.x ** 2 + v.y ** 2 + v.z ** 2))
-
-        if cnt > 100:
-            handleValue = 0
-        elif cnt > 75:
-            handleValue = 0.1
-        elif cnt > 50:
-            handleValue = -0.1
 
         vehicle.apply_control(carla.VehicleControl(throttle=throValue, steer=handleValue))
         # print(f'kmh:{kmh} / throValue:{throValue}')
