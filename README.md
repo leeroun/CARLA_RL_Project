@@ -2,7 +2,7 @@
 
 2022-1 KHU Software Capstone Design Project
 
-## Autonomous driving vehicle in urban traffic with reinforcement learning
+## Autonomous vehicle driving with reinforcement learning
 
 Simulator: CARLA  
 https://github.com/carla-simulator/carla
