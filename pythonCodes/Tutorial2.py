@@ -89,7 +89,7 @@ def clamp(min_v, max_v, value):
 
 def IMU_callback(IMU_data):
     accel = math.sqrt(IMU_data.accelerometer.x * IMU_data.accelerometer.x + IMU_data.accelerometer.y * IMU_data.accelerometer.y + IMU_data.accelerometer.z *IMU_data.accelerometer.z)
-    print(f'accelerometer: {accel} | gyroscope {math.degrees(IMU_data.gyroscope.x)}, {math.degrees(IMU_data.gyroscope.y)}, {math.degrees(IMU_data.gyroscope.z)}' )
+    print(f'accelerometer: {accel} | gyroscope {math.degrees(IMU_data.gyroscope.x)}, {math.degrees(IMU_data.gyroscope.y)}, {math.degrees(IMU_data.gyroscope.z)} / ')
 
 
 def radar_callback(radar_data, vehicle):
@@ -174,10 +174,10 @@ def main():
     bp_library = world.get_blueprint_library()
     bp = bp_library.filter("model3")[0]
 
-    spawn_points = [carla.Transform(carla.Location(-30, -60.8, 0.6), carla.Rotation(0, 0, 0)),
-                    carla.Transform(carla.Location(10, -57.5, 0.6), carla.Rotation(0, 0, 0)),
-                    carla.Transform(carla.Location(10, -60.5, 0.6), carla.Rotation(0, 0, 0)),
-                    carla.Transform(carla.Location(10, -64.7, 0.6), carla.Rotation(0, 0, 0))]
+    # spawn_points = [carla.Transform(carla.Location(-30, -60.8, 0.6), carla.Rotation(0, 0, 0)),
+    #                 carla.Transform(carla.Location(10, -57.5, 0.6), carla.Rotation(0, 0, 0)),
+    #                 carla.Transform(carla.Location(10, -60.5, 0.6), carla.Rotation(0, 0, 0)),
+    #                 carla.Transform(carla.Location(10, -64.7, 0.6), carla.Rotation(0, 0, 0))]
     # carla.Transform(carla.Location(18, -57.5, 0.6), carla.Rotation(0, 0, 0)),
     # carla.Transform(carla.Location(45, -57.5, 0.6), carla.Rotation(0, 0, 0)),
     # carla.Transform(carla.Location(-20, -60.5, 0.6), carla.Rotation(0, 0, 0)),
@@ -217,25 +217,25 @@ def main():
     # carla.Transform(carla.Location(110, 55, 0.6), carla.Rotation(0, -90, 0)),
     # carla.Transform(carla.Location(110, 65, 0.6), carla.Rotation(0, -90, 0)),
     # carla.Transform(carla.Location(110, 75, 0.6), carla.Rotation(0, -90, 0))]
-    # world.get_map().get_self.spawn_points()
+    spawn_points = world.get_map().get_spawn_points()
 
     # actor vehicle 생성
     world.get_spectator().set_transform(spawn_points[0])
     vehicle = world.spawn_actor(bp, spawn_points[0])
     print(f'0: {spawn_points[0]}')
-    # vehicle.set_autopilot(True)
+    vehicle.set_autopilot(True)
 
-    vehicle.apply_control(carla.VehicleControl(throttle=0, steer=1))
+    # vehicle.apply_control(carla.VehicleControl(throttle=0, steer=1))
     actor_list.append(vehicle)
 
     # 다른 vehicle 생성
     vehicle_blueprints = world.get_blueprint_library().filter('*vehicle*')
 
     print("vehicle spawning")
-    for i in range(1, len(spawn_points)):
+    for i in range(1, 100):
         tmp_vehicle = world.try_spawn_actor(vehicle_blueprints[i % len(vehicle_blueprints)], spawn_points[i])
         if tmp_vehicle is not None:
-            # tmp_vehicle.set_autopilot(True)
+            tmp_vehicle.set_autopilot(True)
             vehicle_list.append(tmp_vehicle)
         print(f'{i}: {spawn_points[i]}')
 
@@ -338,8 +338,16 @@ def main():
         v = vehicle.get_velocity()
         kmh = int(3.6 * math.sqrt(v.x ** 2 + v.y ** 2 + v.z ** 2))
 
-        vehicle.apply_control(carla.VehicleControl(throttle=throValue, steer=handleValue))
+        # vehicle.apply_control(carla.VehicleControl(throttle=throValue, steer=handleValue))
         # print(f'kmh:{kmh} / throValue:{throValue}')
+
+        spec_loc = carla.Location(-7, 0, 6)
+        vehicle_transform = vehicle.get_transform()
+        vehicle_transform.transform(spec_loc)
+        spectator_transform = carla.Transform(carla.Location(spec_loc.x, spec_loc.y, spec_loc.z),
+                                                  carla.Rotation(pitch=vehicle_transform.rotation.pitch-25, yaw=vehicle_transform.rotation.yaw, roll=vehicle_transform.rotation.roll))
+
+        world.get_spectator().set_transform(spectator_transform)
 
         waypoint = client.get_world().get_map().get_waypoint(vehicle.get_location(), project_to_road=True)
 
@@ -374,11 +382,11 @@ def main():
                                        + math.pow((vehicle_location.y - right_lane_location.y), 2)
                                        + math.pow((vehicle_location.z - right_lane_location.z), 2))
 
-            # print(
-            #     f'width {waypoint.lane_width} | left line type {waypoint.left_lane_marking} | left line distance {left_distance} '
-            #     f'| right line type {waypoint.right_lane_marking.type} | right line distance {right_distance}')
+            print(
+                f'width {waypoint.lane_width} | left line type {waypoint.left_lane_marking.type} | left line distance {left_distance} '
+                f'| right line type {waypoint.right_lane_marking.type} | right line distance {right_distance}')
 
-        # print(f"distance: {distance} / deltaAngle: {deltaAngle}")
+        print(f"deltaAngle: {deltaAngle}")
 
         #     action = random.randrange(0, 4)
         #     if action == 0:

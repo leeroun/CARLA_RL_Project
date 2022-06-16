@@ -1,6 +1,9 @@
 import glob
+import logging
 import os
 import sys
+import traceback
+
 import RL_Model
 
 try:
@@ -24,7 +27,7 @@ from tqdm import tqdm
 
 MEMORY_FRACTION = 0.8
 AGGREGATE_STATS_EVERY = 10
-EPISODE = 1000
+EPISODE = 5000
 MIN_REWARD = -200
 
 EPSILON_DECAY = 0.9999
@@ -77,68 +80,72 @@ if __name__ == "__main__":
 
     print("Start Learning")
     for episode in tqdm(range(1, EPISODE + 1), ascii=True, unit="episodes"):
+        try:
+            print(f"Episode {episode} / {EPISODE}")
+            env.collision_hist = []
 
-        print(f"Episode {episode} / {EPISODE}")
-        env.collision_hist = []
+            # Tensor Board 업데이트
+            agent.tensorboard.step = episode
 
-        # Tensor Board 업데이트
-        agent.tensorboard.step = episode
+            # Episode 초기화
+            episode_reward = 0
+            step = 1
 
-        # Episode 초기화
-        episode_reward = 0
-        step = 1
+            # Env 초기화
+            current_state = env.reset()
+            done = False
+            episode_start = time.time()
 
-        # Env 초기화
-        current_state = env.reset()
-        done = False
-        episode_start = time.time()
+            # Step 진행
+            while True:
+                if np.random.random() > epsilon:  # epsilon 이상이면 기존 table 값 사용
+                    action = np.argmax(agent.get_qs(current_state))
+                    print(agent.get_qs(current_state))
+                else:  # epsilon 이하면 랜덤으로
+                    action = np.random.randint(0, RL_Model.ACTION_NUMBER)
+                time.sleep(1 / FPS)
+                new_state, reward, done, _ = env.step(action)
+                episode_reward += reward
 
-        # Step 진행
-        while True:
-            if np.random.random() > epsilon:  # epsilon 이상이면 기존 table 값 사용
-                action = np.argmax(agent.get_qs(current_state))
-                print(agent.get_qs(current_state))
-            else:  # epsilon 이하면 랜덤으로
-                action = np.random.randint(0, RL_Model.ACTION_NUMBER)
-            time.sleep(1 / FPS)
-            new_state, reward, done, _ = env.step(action)
-            episode_reward += reward
+                # replay_memory에 저장
+                agent.update_replay_memory((current_state, action, reward, new_state, done))
+                step += 1
 
-            # replay_memory에 저장
-            agent.update_replay_memory((current_state, action, reward, new_state, done))
-            step += 1
+                current_state = new_state
 
-            current_state = new_state
+                if done:
+                    break
 
-            if done:
-                break
+            env.destroy_actors()
+            print(f"episode reward {episode_reward}")
+            # reward 저장
+            ep_rewards.append(episode_reward)
+            if not episode % AGGREGATE_STATS_EVERY or episode == 1:
+                average_reward = sum(ep_rewards[-AGGREGATE_STATS_EVERY:]) / len(ep_rewards[-AGGREGATE_STATS_EVERY:])
+                min_reward = min(ep_rewards[-AGGREGATE_STATS_EVERY:])
+                max_reward = max(ep_rewards[-AGGREGATE_STATS_EVERY:])
+                agent.tensorboard.update_stats(reward_avg=average_reward, reward_min=min_reward, reward_max=max_reward,
+                                               epsilon=epsilon)
 
-        env.destroy_actors()
-        print(f"episode reward {episode_reward}")
-        # reward 저장
-        ep_rewards.append(episode_reward)
-        if not episode % AGGREGATE_STATS_EVERY or episode == 1:
-            average_reward = sum(ep_rewards[-AGGREGATE_STATS_EVERY:]) / len(ep_rewards[-AGGREGATE_STATS_EVERY:])
-            min_reward = min(ep_rewards[-AGGREGATE_STATS_EVERY:])
-            max_reward = max(ep_rewards[-AGGREGATE_STATS_EVERY:])
-            agent.tensorboard.update_stats(reward_avg=average_reward, reward_min=min_reward, reward_max=max_reward,
-                                           epsilon=epsilon)
+                # 모델 저장
+                if episode % 100 == 0:
+                    try:
+                        print(f'saved model in (models/{RL_Model.MODEL_NAME}_episode_{episode}')
+                        agent.model.save_weights(f'models/{RL_Model.MODEL_NAME}_episode_{episode}')
+                    except OSError:
+                        print(OSError)
+                        print(f'save model fail in episode {episode}')
+                # agent.model.save(
+                #     f'models/{RL_Model.MODEL_NAME}__{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.h5')
 
-            # 모델 저장
-            if episode % 100 == 0:
-                try:
-                    print(f'saved model in (models/{RL_Model.MODEL_NAME}_episode_{episode}')
-                    agent.model.save_weights(f'models/{RL_Model.MODEL_NAME}_episode_{episode}')
-                except OSError:
-                    print(OSError)
-                    print(f'save model fail in episode {episode}')
-            # agent.model.save(
-            #     f'models/{RL_Model.MODEL_NAME}__{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.h5')
+            # epsilon 감소
+            if epsilon > MIN_EPSILON:
+                epsilon *= EPSILON_DECAY
+                epsilon = max(MIN_EPSILON, epsilon)
 
-        # epsilon 감소
-        if epsilon > MIN_EPSILON:
-            epsilon *= EPSILON_DECAY
-            epsilon = max(MIN_EPSILON, epsilon)
+        except Exception as e:
+            logging.error(traceback.format_exc())
+            env.destroy_actors()
 
     agent.terminate = True
     trainer_thread.join()

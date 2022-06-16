@@ -1,6 +1,6 @@
-from keras.layers import  Dense, Concatenate, GlobalAveragePooling2D
+from keras.layers import Dense, Add
 from keras.optimizers import Adam
-from keras.models import Sequential, Input, Model
+from keras.models import Input, Model
 from keras.callbacks import TensorBoard
 
 from collections import deque
@@ -21,14 +21,14 @@ TRAINING_BATCH_SIZE = MINIBATCH_SIZE // 4
 UPDATE_TARGET_EVERY = 5
 
 MODEL_INPUTS = 5
-ACTION_NUMBER = 4
+ACTION_NUMBER = 5
 
 DISCOUNT = 0.99
 
 SECONDS_PER_EPISODE = 15
 
 REPLAY_MEMORY_SIZE = 5_000
-MODEL_NAME = "DNN_V2_l2_A4"
+MODEL_NAME = "DNN_V3_l5_A5"
 SHOW_CAM = False
 
 
@@ -79,9 +79,22 @@ class DQNAgent:
         # Left Dis (1) Front Dis (1) Right Dis (1)
 
         d1out = Dense(32, activation='relu')(input_shape)
-        d2out = Dense(16, activation='relu')(d1out)
-        dout = Dense(ACTION_NUMBER, activation='linear')(d2out)
+        d2out = Dense(32, activation='relu')(d1out)
+        d2 = Add()([d2out, d1out])
+        d3out = Dense(32, activation='relu')(d2)
+        d3 = Add()([d3out, d2])
+        d4out = Dense(32, activation='relu')(d3)
+        d4 = Add()([d4out, d3])
 
+        d5out = Dense(16, activation='relu')(d4)
+        d6out = Dense(16, activation='relu')(d5out)
+        d6 = Add()([d6out, d5out])
+        d7out = Dense(16, activation='relu')(d6)
+        d7 = Add()([d7out, d6])
+        d8out = Dense(16, activation='relu')(d7)
+        d8 = Add()([d8out, d7])
+
+        dout = Dense(ACTION_NUMBER, activation='linear')(d8)
         model = Model(inputs=input_shape, outputs=dout)
 
         model.compile(loss="mse", optimizer=Adam(lr=0.001), metrics=["accuracy"])
@@ -222,7 +235,7 @@ class CarEnv:
         self.vehicle = None
 
         self.handle_value = 0.0
-        self.throttle_value = 0.0
+        self.throttle_value = 0.5
 
         self.episode_start = 0
 
@@ -259,7 +272,7 @@ class CarEnv:
                 self.actor_list.append(self.vehicle)
                 break
 
-        for i in range(0, 150):
+        for i in range(0, 100):
             tmp_vehicle = self.world.try_spawn_actor(random.choice(self.vehicle_blueprints), random.choice(self.spawn_points))
             if tmp_vehicle is not None:
                 tmp_vehicle.set_autopilot(True)
@@ -419,11 +432,11 @@ class CarEnv:
                 front_list.append(distance)
 
         if len(left_list) != 0:
-            self.left_distance = np.mean(left_list)
+            self.left_distance = min(left_list)
         if len(right_list) != 0:
-            self.right_distance = np.mean(right_list)
+            self.right_distance = min(right_list)
         if len(front_list) != 0:
-            self.front_distance = np.mean(front_list)
+            self.front_distance = min(front_list)
 
     def IMU_callback(self, data):
         accel_value = math.sqrt(data.accelerometer.x * data.accelerometer.x + data.accelerometer.y * data.accelerometer.y + data.accelerometer.z *data.accelerometer.z)
@@ -447,8 +460,10 @@ class CarEnv:
         elif action == 1:
             self.handle_value = -1
         elif action == 2:
-            self.handle_value = 1
+            self.handle_value = 0
         elif action == 3:
+            self.handle_value = 1
+        elif action == 4:
             brake_value = 1
 
         # print(f'throttle: {self.throttle_value} steer" {self.handle_value}')
